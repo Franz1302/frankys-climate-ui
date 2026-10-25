@@ -58,6 +58,16 @@ function make(extra={}){
  assert(render.c.shadowRoot.innerHTML.includes('data-slider'));
  assert(render.c.shadowRoot.innerHTML.includes('M28 0 C44 17'),'Flame artwork present');
  assert(!render.c.shadowRoot.innerHTML.includes('data-action="manual"'));
+ // Heating state is deliberately short; no duplicate room name may overlap the flame.
+ render.c._config.name='SCHLAFZIMMER';
+ render.c._render();
+ assert(render.c.shadowRoot.innerHTML.includes('>OFF</text>'));
+ assert(!render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER ·'));
+ assert(render.c.shadowRoot.innerHTML.includes('transform="translate(628 163)"'));
+ assert(render.c.shadowRoot.innerHTML.includes('y="282"'));
+ render.states['climate.one'].attributes.hvac_action='heating';
+ render.c._render();
+ assert(render.c.shadowRoot.innerHTML.includes('>HEATING</text>'));
 
  // HUD border must not be clipped by a fixed-radius wrapper when the card is narrow.
  assert(source.includes('overflow:visible;border-radius:0'),'SVG corners should not be CSS-clipped');
