@@ -5,7 +5,7 @@
 })();
 
 /**
- * Franky's Climate UI v0.1.1 — responsive corners and real Celsius/Fahrenheit conversion
+ * Franky's Climate UI v0.1.2 — responsive corners and real Celsius/Fahrenheit conversion
  * Reusable 1000x640 climate control for Home Assistant. Keeps legacy custom element IDs.
  */
 const FrankysClimateScheduleEnglishErrors = {
