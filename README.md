@@ -1,5 +1,10 @@
 # Franky's Climate UI — v0.1.0 Preview 🔥
 
+![Franky's Climate UI — Designskizze](https://raw.githubusercontent.com/Franz1302/frankys-climate-ui/main/images/climate-ui-preview.svg)
+
+*Designskizze zur Orientierung. Die tatsächliche Karte übernimmt die Werte aus Home Assistant.*
+
+
 A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
 
 ## Functions
