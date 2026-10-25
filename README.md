@@ -1,4 +1,4 @@
-# Franky's Climate UI — v0.1.1 Preview 🔥
+# Franky's Climate UI — v0.1.2 Preview 🔥
 
 ![Franky's Climate UI — Designskizze](https://raw.githubusercontent.com/Franz1302/frankys-climate-ui/main/images/climate-ui-preview.svg)
 
@@ -19,6 +19,7 @@ A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based
 - Visual card editor with **language** selection: Auto (Home Assistant), Deutsch, English. Number formatting follows the selected language (21,5 / 21.5).
 - **Temperature units**: Auto (Home Assistant), Celsius (°C) or Fahrenheit (°F). Readings, setpoint, ring tick labels and schedule info use the chosen unit, while service calls retain their actual source entity units.
 - Proportional SVG scaling without clipping the HUD's rounded corners when resized.
+- **v0.1.2:** Home Assistant Sections cards now request 12 columns and automatic intrinsic height, preventing squeezed/overlapping dashboard rows. Explicit dashboard `grid_options.rows` values still override this default.
 
 ## Configuration
 
@@ -72,7 +73,7 @@ Add `https://github.com/Franz1302/frankys-climate-ui` to **HACS → Custom repos
 
 ### Testing
 
-Core behavior simulated with native HVAC, helper modes, target temperature helper, heating sensor, on/off flame actor and AUS guard; JavaScript compilation and HUD markup render checked. Hardware testing and native schedule dialog verification remain outstanding. v0.1.1 is a preview; review behavior before controlling real heating hardware.
+Core behavior simulated with native HVAC, helper modes, target temperature helper, heating sensor, on/off flame actor and AUS guard; JavaScript compilation and HUD markup render checked. Hardware testing and native schedule dialog verification remain outstanding. v0.1.2 is a preview; review behavior before controlling real heating hardware.
 
 ### License
 
