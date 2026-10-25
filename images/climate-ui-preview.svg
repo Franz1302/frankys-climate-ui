@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" width="1000" height="640" role="img" aria-labelledby="t d">
+<title id="t">Franky's Climate UI — design concept</title>
+<desc id="d">Illustration of a dark JARVIS-style climate card with a touch temperature dial, orange flame, mode buttons and 24-hour temperature trend.</desc>
+<defs>
+  <linearGradient id="back" x2="1" y2="1"><stop stop-color="#051c2c"/><stop offset="1" stop-color="#020a12"/></linearGradient>
+  <linearGradient id="dial"><stop stop-color="#0389fb"/><stop offset=".25" stop-color="#00e4ef"/><stop offset=".54" stop-color="#e9ed39"/><stop offset=".77" stop-color="#ff9838"/><stop offset="1" stop-color="#f53740"/></linearGradient>
+  <linearGradient id="flame" x2="0" y2="1"><stop stop-color="#fff4ab"/><stop offset=".45" stop-color="#ffb031"/><stop offset="1" stop-color="#ef591d"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<rect width="1000" height="640" rx="25" fill="url(#back)" stroke="#18c8f6" stroke-width="3"/>
+<rect x="24" y="25" width="290" height="246" rx="20" fill="#071722" stroke="#37b4dd" stroke-opacity=".6" stroke-width="2"/>
+<text x="47" y="65" fill="#c3f4ff" font-size="23" font-family="Arial,sans-serif" font-weight="bold">AKTUELL</text>
+<text x="46" y="148" fill="#edfaff" font-size="80" font-family="Arial,sans-serif" font-weight="bold">21,5</text>
+<text x="260" y="106" fill="#c6efff" font-size="28" font-family="Arial,sans-serif">°C</text>
+<polyline fill="none" stroke="#0eefff" stroke-width="4" points="40,217 68,209 95,216 122,188 152,198 184,179 215,184 241,164 270,169 295,157"/>
+<text x="47" y="249" fill="#68bed4" font-size="14" font-family="Arial,sans-serif">TEMPERATUR · 24 H</text>
+<rect x="24" y="293" width="290" height="324" rx="20" fill="#071722" stroke="#37b4dd" stroke-opacity=".6" stroke-width="2"/>
+<text x="65" y="332" fill="#e4f7ff" font-size="25" font-family="Arial,sans-serif" font-weight="bold">MODUS</text>
+<rect x="53" y="360" width="232" height="68" rx="16" fill="#091724" stroke="#35556c" stroke-width="2"/>
+<text x="170" y="405" text-anchor="middle" fill="#99b7c4" font-family="Arial,sans-serif" font-size="29" font-weight="bold">AUS</text>
+<rect x="53" y="441" width="232" height="68" rx="16" fill="#053345" stroke="#01e9ff" stroke-width="2.5"/>
+<text x="170" y="486" text-anchor="middle" fill="#62f3ff" font-family="Arial,sans-serif" font-size="29" font-weight="bold">AUTO</text>
+<rect x="53" y="523" width="232" height="68" rx="16" fill="#091724" stroke="#35556c" stroke-width="2"/>
+<text x="170" y="566" text-anchor="middle" fill="#99b7c4" font-family="Arial,sans-serif" font-size="26" font-weight="bold">MANUELL</text>
+<rect x="335" y="25" width="643" height="592" rx="20" fill="#06141e" stroke="#28bedf" stroke-opacity=".5" stroke-width="2"/>
+<text x="654" y="61" text-anchor="middle" fill="#bdeefe" font-size="20" font-weight="bold" letter-spacing="4" font-family="Arial,sans-serif">FRANKY’S CLIMATE UI</text>
+<g transform="translate(656 338)">
+  <circle r="236" fill="none" stroke="#163342" stroke-width="30"/>
+  <circle r="235" fill="none" stroke="url(#dial)" stroke-width="13" stroke-dasharray="1090 400" transform="rotate(135)" stroke-linecap="round"/>
+  <circle r="175" fill="#081722" stroke="#5b8291" stroke-width="2"/>
+  <circle r="163" fill="none" stroke="#162e39" stroke-width="7"/>
+  <path d="M-155 -133 L-165 -145" stroke="#ff9e22" stroke-width="24" stroke-linecap="round" filter="url(#glow)" opacity=".75"/>
+  <path d="M-155 -133 L-165 -145" stroke="#ffa632" stroke-width="14" stroke-linecap="round"/>
+</g>
+<g transform="translate(628 163) scale(1.05)" fill="url(#flame)">
+  <path d="M28 0 C44 17 48 29 40 42 C59 31 60 22 57 10 C83 36 78 64 57 76 C32 88 7 73 10 48 C13 31 23 21 28 0Z"/>
+  <path fill="#fff4b1" d="M40 32 C46 46 31 52 35 62 C38 67 46 67 50 60 C55 77 26 82 22 62 C19 49 29 39 40 32Z"/>
+</g>
+<text x="656" y="278" fill="#e6f8ff" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="23">HEIZT</text>
+<text x="656" y="321" fill="#d9f5ff" text-anchor="middle" font-family="Arial,sans-serif" font-size="25">Soll-Temperatur</text>
+<text x="656" y="415" fill="#ffb13b" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="93">22,0</text>
+<text x="794" y="372" fill="#ffc45a" font-family="Arial,sans-serif" font-size="36">°C</text>
+<circle cx="569" cy="507" r="49" fill="#061b28" stroke="#1ad5fa" stroke-width="2"/>
+<text x="569" y="526" text-anchor="middle" fill="#f1faff" font-family="Arial,sans-serif" font-size="64">−</text>
+<circle cx="750" cy="507" r="49" fill="#201208" stroke="#ff9632" stroke-width="2"/>
+<text x="750" y="528" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="62">+</text>
+<circle cx="923" cy="87" r="25" fill="#061722" stroke="#16cbe7" stroke-width="2"/>
+<path d="M923 73V88L934 95" fill="none" stroke="#29ddfb" stroke-width="3" stroke-linecap="round"/>
+<text x="659" y="601" text-anchor="middle" fill="#5ba8bc" font-family="Arial,sans-serif" font-size="15">Designskizze · kein Live-Screenshot</text>
+</svg>
