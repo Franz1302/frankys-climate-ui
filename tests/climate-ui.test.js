@@ -58,5 +58,62 @@ function make(extra={}){
  assert(render.c.shadowRoot.innerHTML.includes('data-slider'));
  assert(render.c.shadowRoot.innerHTML.includes('M28 0 C44 17'),'Flame artwork present');
  assert(!render.c.shadowRoot.innerHTML.includes('data-action="manual"'));
- console.log('PASS: Climate UI core functionality and HUD render');
+
+ // HUD border must not be clipped by a fixed-radius wrapper when the card is narrow.
+ assert(source.includes('overflow:visible;border-radius:0'),'SVG corners should not be CSS-clipped');
+ assert(!source.includes('overflow:hidden;border-radius:22px'));
+
+ // Language and display units change formatting but never change HA's native value.
+ const fahrenheit=make({temperature_unit:'fahrenheit'});
+ fahrenheit.c._hass.config.unit_system={temperature:'°C'};
+ assert.equal(fahrenheit.c._displayTempUnit(),'°F');
+ assert.equal(fahrenheit.c._fmtTemp(20),'68.0');
+ assert.equal(fahrenheit.c._fmtTemp(21),'69.8');
+ assert.equal(fahrenheit.c._targetTemp(),21);
+ await fahrenheit.c._setTarget(23);
+ assert.equal(fahrenheit.calls[0][2].temperature,23,'display Fahrenheit must not alter native °C service');
+ fahrenheit.c._config.language='de';
+ assert.equal(fahrenheit.c._fmtTemp(21),'69,8');
+ fahrenheit.c._config.temperature_unit='auto';
+ assert.equal(fahrenheit.c._fmtTemp(21),'21,0');
+
+ // A Fahrenheit Home Assistant and native Fahrenheit thermostat must not be converted twice.
+ const nativeF=make({temperature_unit:'auto'});
+ nativeF.c._hass.config.unit_system={temperature:'°F'};
+ nativeF.states['climate.one'].attributes.current_temperature=68;
+ nativeF.states['climate.one'].attributes.temperature=71.6;
+ nativeF.states['climate.one'].attributes.min_temp=41;
+ nativeF.states['climate.one'].attributes.max_temp=86;
+ assert.equal(nativeF.c._displayTempUnit(),'°F');
+ assert.equal(nativeF.c._fmtTemp(nativeF.c._actualTemp()),'68.0');
+ assert.equal(nativeF.c._targetTemp(),71.6);
+ nativeF.c._config.temperature_unit='celsius';
+ assert.equal(nativeF.c._fmtTemp(68),'20.0');
+ await nativeF.c._setTarget(75);
+ assert.equal(nativeF.calls[0][2].temperature,75,'native °F service should receive °F');
+
+ // Sensors and separate target helpers can report units different from climate.
+ const mixed=make({temperature_entity:'sensor.f',target_entity:'input_number.f',temperature_unit:'celsius'});
+ mixed.c._hass.config.unit_system={temperature:'°C'};
+ mixed.states['sensor.f']={state:'71.6',attributes:{unit_of_measurement:'°F'}};
+ mixed.states['input_number.f']={state:'69.8',attributes:{unit_of_measurement:'°F',min:41,max:86,step:0.9}};
+ assert(Math.abs(mixed.c._actualTemp()-22)<1e-8);
+ assert(Math.abs(mixed.c._targetTemp()-21)<1e-8);
+ assert(Math.abs(mixed.c._step()-0.5)<1e-8);
+ assert(Math.abs(mixed.c._minTemp()-5)<1e-8);
+ assert(Math.abs(mixed.c._maxTemp()-30)<1e-8);
+ await mixed.c._setTarget(25);
+ assert.equal(mixed.calls[0][0],'input_number');
+ assert.equal(mixed.calls[0][2].value,77,'target helper must receive its own °F');
+
+ // Dial and schedule labels use the requested output unit.
+ fahrenheit.c._config.temperature_unit='fahrenheit';
+ const labels=fahrenheit.c._dialGeometry(21,20).labels;
+ assert(labels.includes('41') && labels.includes('86'),'Fahrenheit labels on dial');
+ fahrenheit.c._config.schedule_entity='schedule.plan';
+ assert(fahrenheit.c._scheduleInfo().includes('°F'));
+
+ // The visual editor must expose the unit selector in addition to the language selector.
+ assert(source.includes('id="temperature_unit"') && source.includes('id="language"'));
+ console.log('PASS: Climate UI core, responsive frame, DE/EN and °C/°F conversions');
 })().catch(error=>{console.error(error);process.exitCode=1});
