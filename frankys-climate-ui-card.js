@@ -839,8 +839,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const modeText = m => mode === m ? (m === "AUS" ? "#ff9c46" : "#34e9ff") : "#9eb1bd";
     const status=this._error|| (this._pending?this._t("sending"):
       (mode==="UNAVAILABLE"||heatingStatusUnavailable)?this._t("unavailable"):
-      mode==="AUS"?name.toUpperCase()+" · "+this._t("off"):
-      name.toUpperCase()+" · "+this._t(heaterOn?"active":"noHeat"));
+      mode==="AUS"?this._t("off"):this._t(heaterOn?"active":"noHeat"));
     const safeName = this._escape(name.toUpperCase());
     const safeStatus = this._escape(status);
     const safeScheduleInfo = this._escape(this._scheduleInfo());
@@ -910,12 +909,12 @@ class JarvisClimateCardLegacy extends HTMLElement {
           <circle cx="${g.cx}" cy="${g.cy}" r="171" fill="#07141d" stroke="#758b98" stroke-opacity=".55" stroke-width="3"/>
           <circle cx="${g.cx}" cy="${g.cy}" r="159" fill="none" stroke="#182e3b" stroke-width="8"/>
 
-          <g transform="translate(628 190)" fill="${heaterOn?"#ff9d2a":"#46545c"}" ${heaterOn?'filter="url(#heatGlow)"':""}>
+          <g transform="translate(628 163)" fill="${heaterOn?"#ff9d2a":"#46545c"}" ${heaterOn?'filter="url(#heatGlow)"':""}>
             <path d="M28 0 C44 17 48 29 40 42 C59 31 60 22 57 10 C83 36 78 64 57 76 C32 88 7 73 10 48 C13 31 23 21 28 0Z"/>
             <path fill="${heaterOn?"#ffdb74":"#7b858c"}" d="M40 32 C46 46 31 52 35 62 C38 67 46 67 50 60 C55 77 26 82 22 62 C19 49 29 39 40 32Z"/>
           </g>
-          ${this._config.flame_switch_entity&&mode!=="AUS"?'<rect class="hit" data-action="flame" x="598" y="185" width="120" height="90"/>':""}
-          <text x="655" y="275" fill="#e2f0f7" font-family="Arial" font-size="23" font-weight="600" text-anchor="middle">${safeStatus}</text>
+          ${this._config.flame_switch_entity&&mode!=="AUS"?'<rect class="hit" data-action="flame" x="598" y="158" width="120" height="90"/>':""}
+          <text x="655" y="282" fill="#e2f0f7" font-family="Arial" font-size="23" font-weight="600" text-anchor="middle">${safeStatus}</text>
           <text x="655" y="320" fill="#e7f3f9" font-family="Arial" font-size="27" font-weight="500" text-anchor="middle">${this._t("target")}</text>
           <text data-slider-value x="655" y="398" fill="#ffb13b" font-family="Arial" font-size="88" font-weight="700" text-anchor="middle">${this._fmtTemp(target)}</text>
           <text x="764" y="362" fill="#ffc25a" font-family="Arial" font-size="35" font-weight="600">${this._displayTempUnit()}</text>
