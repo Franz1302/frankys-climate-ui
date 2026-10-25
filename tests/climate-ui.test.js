@@ -65,7 +65,8 @@ function make(extra={}){
  assert(!render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER ·'));
  assert(render.c.shadowRoot.innerHTML.includes('transform="translate(628 163)"'));
  assert(render.c.shadowRoot.innerHTML.includes('y="282"'));
- render.states['climate.one'].attributes.hvac_action='heating';
+ // Explicit heating sensor takes precedence over hvac_action in this configuration.
+ render.states['binary_sensor.heating'].state='on';
  render.c._render();
  assert(render.c.shadowRoot.innerHTML.includes('>HEATING</text>'));
 
