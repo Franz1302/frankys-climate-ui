@@ -111,6 +111,7 @@ function make(extra={}){
  const labels=fahrenheit.c._dialGeometry(21,20).labels;
  assert(labels.includes('41') && labels.includes('86'),'Fahrenheit labels on dial');
  fahrenheit.c._config.schedule_entity='schedule.plan';
+ fahrenheit.states['climate.one'].state='auto';
  assert(fahrenheit.c._scheduleInfo().includes('°F'));
 
  // The visual editor must expose the unit selector in addition to the language selector.
