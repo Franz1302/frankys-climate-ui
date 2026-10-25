@@ -5,7 +5,7 @@
 })();
 
 /**
- * Frankys_Stuff Climate Card UI-only v0.1.0 — no internal heating regulation
+ * Franky's Climate UI v0.1.1 — responsive corners and real Celsius/Fahrenheit conversion
  * Reusable 1000x640 climate control for Home Assistant. Keeps legacy custom element IDs.
  */
 const FrankysClimateScheduleEnglishErrors = {
@@ -104,6 +104,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     this._config = {
       name: "Klima",
       language: "auto",
+      temperature_unit: "auto",
       profile: "thermostat",
       scale: 1, // legacy: kept for old configs, no longer used for layout
       min_temp: null,
@@ -139,6 +140,34 @@ class JarvisClimateCardLegacy extends HTMLElement {
   getCardSize() { return 6; }
   _state(id) { return id && this._hass && this._hass.states ? this._hass.states[id] : undefined; }
   _num(v, fallback = NaN) { const n = Number(v); return Number.isFinite(n) ? n : fallback; }
+  _unit(value) {
+    const text = String(value || "").trim().toLowerCase();
+    if (["°c", "c", "celsius"].includes(text)) return "°C";
+    if (["°f", "f", "fahrenheit"].includes(text)) return "°F";
+    return null;
+  }
+  _haTempUnit() {
+    const config = this._hass && this._hass.config;
+    return this._unit(config && config.unit_system && config.unit_system.temperature) || "°C";
+  }
+  _nativeTempUnit() {
+    const state = this._controlState() || this._displayState();
+    const attrs = state && state.attributes || {};
+    return this._unit(attrs.temperature_unit || attrs.unit_of_measurement) || this._haTempUnit();
+  }
+  _sourceTempUnit(entityId) {
+    const state = this._state(entityId);
+    const attrs = state && state.attributes || {};
+    return this._unit(attrs.unit_of_measurement || attrs.temperature_unit) || this._nativeTempUnit();
+  }
+  _displayTempUnit() { return this._unit(this._config && this._config.temperature_unit) || this._haTempUnit(); }
+  _convertTemp(value, fromUnit, toUnit) {
+    if (!Number.isFinite(value)) return NaN;
+    if (fromUnit === toUnit) return value;
+    return fromUnit === "°C" ? value * 9 / 5 + 32 : (value - 32) * 5 / 9;
+  }
+  _toNativeTemp(value, sourceUnit) { return this._convertTemp(value, sourceUnit, this._nativeTempUnit()); }
+  _toDisplayTemp(value) { return this._convertTemp(value, this._nativeTempUnit(), this._displayTempUnit()); }
   _profile() { return "thermostat"; }
   _lang() {
     let raw = String((this._config && this._config.language) || "auto").toLowerCase();
@@ -169,8 +198,12 @@ class JarvisClimateCardLegacy extends HTMLElement {
   _controlState() { return this._state(this._config.control_entity || this._config.display_entity); }
 
   _actualTemp() {
-    if (this._config.temperature_entity) { const s = this._state(this._config.temperature_entity); return this._num(s ? s.state : undefined); }
-    const s = this._displayState(); return this._num(s && s.attributes ? s.attributes.current_temperature : undefined);
+    if (this._config.temperature_entity) {
+      const id = this._config.temperature_entity, state = this._state(id);
+      return this._toNativeTemp(this._num(state ? state.state : undefined), this._sourceTempUnit(id));
+    }
+    const state = this._displayState();
+    return this._num(state && state.attributes ? state.attributes.current_temperature : undefined);
   }
 
   _recordTemperature() {
@@ -358,7 +391,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const entity = this._config.target_entity;
     const state = entity ? this._state(entity) : this._displayState();
     const reported = entity
-      ? this._num(state ? state.state : undefined)
+      ? this._toNativeTemp(this._num(state ? state.state : undefined), this._sourceTempUnit(entity))
       : this._num(state && state.attributes ? state.attributes.temperature : undefined);
     const optimistic = this._optimisticTarget;
     if (optimistic && (
@@ -392,26 +425,38 @@ class JarvisClimateCardLegacy extends HTMLElement {
   _minTemp() {
     const ds = this._displayState(); const attr = ds && ds.attributes ? ds.attributes.min_temp : undefined;
     const cfg = this._config.min_temp;
-    return cfg === null || cfg === undefined || cfg === ""
-      ? this._num(attr, 5)
-      : this._num(cfg, this._num(attr, 5));
+    const climateMin = this._num(attr, this._nativeTempUnit() === "°F" ? 41 : 5);
+    const helper = this._config.target_entity && this._state(this._config.target_entity);
+    const helperMin = helper && helper.attributes && helper.attributes.min;
+    const bounded = helperMin !== undefined && helperMin !== null && Number.isFinite(Number(helperMin))
+      ? Math.max(climateMin, this._toNativeTemp(Number(helperMin), this._sourceTempUnit(this._config.target_entity))) : climateMin;
+    return cfg === null || cfg === undefined || cfg === "" ? bounded : this._num(cfg, bounded);
   }
 
   _maxTemp() {
     const ds = this._displayState(); const attr = ds && ds.attributes ? ds.attributes.max_temp : undefined;
     const cfg = this._config.max_temp;
-    return cfg === null || cfg === undefined || cfg === ""
-      ? this._num(attr, 35)
-      : this._num(cfg, this._num(attr, 35));
+    const climateMax = this._num(attr, this._nativeTempUnit() === "°F" ? 95 : 35);
+    const helper = this._config.target_entity && this._state(this._config.target_entity);
+    const helperMax = helper && helper.attributes && helper.attributes.max;
+    const bounded = helperMax !== undefined && helperMax !== null && Number.isFinite(Number(helperMax))
+      ? Math.min(climateMax, this._toNativeTemp(Number(helperMax), this._sourceTempUnit(this._config.target_entity))) : climateMax;
+    return cfg === null || cfg === undefined || cfg === "" ? bounded : this._num(cfg, bounded);
   }
 
   _step() {
     const ds = this._displayState(); const attr = ds && ds.attributes ? ds.attributes.target_temp_step : undefined;
-    const cfg = this._config.step;
-    const value = cfg === null || cfg === undefined || cfg === ""
-      ? this._num(attr, 0.5)
-      : this._num(cfg, this._num(attr, 0.5));
-    return Math.max(0.1, value);
+    const cfg = this._config.step, target = this._config.target_entity;
+    const helper = target && this._state(target);
+    const helperStep = helper && helper.attributes && Number(helper.attributes.step);
+    const sourceUnit = target ? this._sourceTempUnit(target) : this._nativeTempUnit();
+    const helperStepNative = helperStep > 0 && Number.isFinite(helperStep)
+      ? this._convertTemp(helperStep, sourceUnit, this._nativeTempUnit()) -
+        this._convertTemp(0, sourceUnit, this._nativeTempUnit()) : NaN;
+    const standard = Number.isFinite(helperStepNative) && helperStepNative > 0
+      ? helperStepNative : this._num(attr, this._nativeTempUnit() === "°F" ? 1 : 0.5);
+    const value = cfg === null || cfg === undefined || cfg === "" ? standard : this._num(cfg, standard);
+    return Math.max(0.05, value);
   }
 
   async _call(domain, service, data = {}, target) {
@@ -491,7 +536,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
   async _changeTarget(delta) {
     const current = this._targetTemp();
     if (!Number.isFinite(current)) return;
-    const next = Math.max(this._minTemp(), Math.min(this._maxTemp(), Math.round((current + delta) * 10) / 10));
+    const next = Math.max(this._minTemp(), Math.min(this._maxTemp(), Number((current + delta).toFixed(6))));
 
     return this._setTarget(next);
   }
@@ -504,7 +549,8 @@ class JarvisClimateCardLegacy extends HTMLElement {
       if (entityDomain === "input_number" || entityDomain === "number") {
         domain = entityDomain;
         service = "set_value";
-        data = { entity_id: this._config.target_entity, value: next };
+        const helperValue = this._convertTemp(next, this._nativeTempUnit(), this._sourceTempUnit(this._config.target_entity));
+        data = { entity_id: this._config.target_entity, value: Number(helperValue.toFixed(5)) };
       }
     }
     if (!domain) {
@@ -660,7 +706,11 @@ class JarvisClimateCardLegacy extends HTMLElement {
     slider.addEventListener("click", ev => ev.stopPropagation());
   }
 
-  _fmtTemp(n) { return Number.isFinite(n) ? n.toFixed(1).replace(".", ",") : "–"; }
+  _fmtTemp(n) {
+    if (!Number.isFinite(n)) return "–";
+    const value = this._toDisplayTemp(n).toFixed(1);
+    return this._lang() === "de" ? value.replace(".", ",") : value;
+  }
 
   _scheduleInfo() {
     if (!this._scheduleEnabled() || this._mode() !== "AUTO") return "";
@@ -668,7 +718,9 @@ class JarvisClimateCardLegacy extends HTMLElement {
     if (!plan) return this._t("auto") + " · " + this._t("scheduleSetup");
     const raw = plan && plan.attributes ? plan.attributes.temperature : undefined;
     const temp = raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
-    if (!plan || plan.state !== "on" || !Number.isFinite(temp) || temp < this._minTemp() || temp > this._maxTemp()) {
+    const nativeTemp = this._toNativeTemp(temp, this._config.target_entity
+      ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit());
+    if (!plan || plan.state !== "on" || !Number.isFinite(nativeTemp) || nativeTemp < this._minTemp() || nativeTemp > this._maxTemp()) {
       return this._t("auto") + " · " + this._t("noBlock");
     }
     const block = String(plan.attributes.block || "HEIZPLAN").toUpperCase();
@@ -679,7 +731,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
           timeZone: (this._hass && this._hass.config && this._hass.config.time_zone) || "Europe/Vienna"
         }).format(next)
       : "";
-    return (this._t("auto") + " · " + block + " " + this._fmtTemp(temp) + " °C" + until)
+    return (this._t("auto") + " · " + block + " " + this._fmtTemp(nativeTemp) + " " + this._displayTempUnit() + until)
       .replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   }
 
@@ -746,7 +798,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
         const a = start + sweep * (value - min) / range;
         // Center each number on the former main tick (r = 250 to 266).
         const pt = polar(a, 258);
-        const text = String(Number(value.toFixed(8))).replace(".", this._lang() === "de" ? "," : ".");
+        const text = String(Number(this._toDisplayTemp(value).toFixed(1))).replace(".", this._lang() === "de" ? "," : ".");
         const fit = text.length > 2 ? ' textLength="32" lengthAdjust="spacingAndGlyphs"' : "";
         return `<text x="${pt.x}" y="${pt.y}" dy=".35em" fill="#eef8ff" font-size="22" font-weight="600" font-family="Arial" text-anchor="middle"${fit}>${text}</text>`;
       }).join("");
@@ -796,8 +848,10 @@ class JarvisClimateCardLegacy extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host{display:block;width:100%;max-width:100%;margin:0 auto;font-family:Arial,sans-serif;}
-        .frame{position:relative;width:100%;height:0;padding-bottom:64%;overflow:hidden;border-radius:22px;user-select:none;-webkit-user-select:none;touch-action:manipulation;}
-        svg{position:absolute;top:0;left:0;display:block;width:100%;height:100%;}
+        /* The SVG already has its own rounded border. A fixed CSS border radius
+           clipped those corners when the card was displayed at small sizes. */
+        .frame{position:relative;width:100%;height:0;padding-bottom:64%;overflow:visible;border-radius:0;user-select:none;-webkit-user-select:none;touch-action:manipulation;}
+        svg{position:absolute;top:0;left:0;display:block;width:100%;height:100%;overflow:visible;}
         .hit{cursor:pointer;fill:transparent;pointer-events:all;}
         .hit:hover{fill:rgba(255,255,255,.025);}
       </style>
@@ -821,7 +875,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
           <text x="126" y="94" fill="#e8f5fc" font-family="Arial" font-size="29" font-weight="600" text-anchor="start">${this._t("actual")}</text>
           <text x="72" y="98" fill="#ff7d25" font-family="Arial" font-size="46">♨</text>
           <text x="175" y="208" fill="#f4fbff" font-family="Arial" font-size="86" font-weight="650" text-anchor="middle">${this._fmtTemp(actual)}</text>
-          <text x="258" y="170" fill="#f4fbff" font-family="Arial" font-size="35" font-weight="600">°C</text>
+          <text x="258" y="170" fill="#f4fbff" font-family="Arial" font-size="35" font-weight="600">${this._displayTempUnit()}</text>
 
           <rect x="40" y="300" width="270" height="300" rx="18" fill="#071722" stroke="#67d9ff" stroke-opacity=".42" stroke-width="2"/>
           <text x="91" y="350" fill="#18dfff" font-family="Arial" font-size="38">⚙</text>
@@ -864,7 +918,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
           <text x="655" y="275" fill="#e2f0f7" font-family="Arial" font-size="23" font-weight="600" text-anchor="middle">${safeStatus}</text>
           <text x="655" y="320" fill="#e7f3f9" font-family="Arial" font-size="27" font-weight="500" text-anchor="middle">${this._t("target")}</text>
           <text data-slider-value x="655" y="398" fill="#ffb13b" font-family="Arial" font-size="88" font-weight="700" text-anchor="middle">${this._fmtTemp(target)}</text>
-          <text x="764" y="362" fill="#ffc25a" font-family="Arial" font-size="35" font-weight="600">°C</text>
+          <text x="764" y="362" fill="#ffc25a" font-family="Arial" font-size="35" font-weight="600">${this._displayTempUnit()}</text>
 
           <circle cx="568" cy="490" r="57" fill="#071722" stroke="#23d8ff" stroke-width="2"/>
           <text x="568" y="510" fill="#f3fbff" font-family="Arial" font-size="66" font-weight="500" text-anchor="middle">−</text>
