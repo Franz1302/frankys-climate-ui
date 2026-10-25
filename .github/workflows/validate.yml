@@ -1,0 +1,27 @@
+name: Verify Climate UI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: node --check frankys-climate-ui-card.js
+      - name: Climate UI functional regressions
+        run: node tests/climate-ui.test.js
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate HACS dashboard plugin
+        uses: hacs/action@main
+        with:
+          category: plugin
