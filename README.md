@@ -1,4 +1,4 @@
-# Franky's Climate UI — v0.1.0 Preview 🔥
+# Franky's Climate UI — v0.1.1 Preview 🔥
 
 ![Franky's Climate UI — Designskizze](https://raw.githubusercontent.com/Franz1302/frankys-climate-ui/main/images/climate-ui-preview.svg)
 
@@ -16,7 +16,9 @@ A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based
 - Orange heating flame: **on** when measured heating is active, **off** otherwise. No standby state.
 - Optional direct flame toggle only for a deliberately selected, suitable heater actuator. No automatic detection of a mains supply plug; when AUS is selected the flame control is locked.
 - Clock opens an **existing Home Assistant Schedule helper's native detail/editor dialog**. It appears only when a schedule is configured or linked to the climate entity.
-- Visual card editor, DE/EN UI.
+- Visual card editor with **language** selection: Auto (Home Assistant), Deutsch, English. Number formatting follows the selected language (21,5 / 21.5).
+- **Temperature units**: Auto (Home Assistant), Celsius (°C) or Fahrenheit (°F). Readings, setpoint, ring tick labels and schedule info use the chosen unit, while service calls retain their actual source entity units.
+- Proportional SVG scaling without clipping the HUD's rounded corners when resized.
 
 ## Configuration
 
@@ -26,6 +28,8 @@ Minimal (works for native climate features; unsupported modes are disabled):
 type: custom:frankys-climate-ui-card
 name: Wohnzimmer
 display_entity: climate.wohnzimmer
+language: auto
+temperature_unit: auto
 ```
 
 With existing HA helpers and heating status:
@@ -34,6 +38,8 @@ With existing HA helpers and heating status:
 type: custom:frankys-climate-ui-card
 name: Schlafzimmer
 display_entity: climate.schlafzimmer
+language: de
+temperature_unit: celsius  # or fahrenheit / auto
 temperature_entity: sensor.schlafzimmer_temperatur
 target_entity: input_number.schlafzimmer_soll
 mode_entity: input_select.schlafzimmer_modus
@@ -66,7 +72,7 @@ Add `https://github.com/Franz1302/frankys-climate-ui` to **HACS → Custom repos
 
 ### Testing
 
-Core behavior simulated with native HVAC, helper modes, target temperature helper, heating sensor, on/off flame actor and AUS guard; JavaScript compilation and HUD markup render checked. Hardware testing and native schedule dialog verification remain outstanding. v0.1.0 is a preview; review behavior before controlling real heating hardware.
+Core behavior simulated with native HVAC, helper modes, target temperature helper, heating sensor, on/off flame actor and AUS guard; JavaScript compilation and HUD markup render checked. Hardware testing and native schedule dialog verification remain outstanding. v0.1.1 is a preview; review behavior before controlling real heating hardware.
 
 ### License
 
