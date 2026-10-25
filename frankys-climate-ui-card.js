@@ -964,6 +964,9 @@ const FrankysClimateEditorEnglish = {
   "Sprache / Language": "Language",
   "Deutsch": "German",
   "English": "English",
+  "Temperatur-Einheit": "Temperature unit",
+  "Celsius (°C)": "Celsius (°C)",
+  "Fahrenheit (°F)": "Fahrenheit (°F)",
   "Profil": "Profile",
   "Climate / Wärmepumpe": "Climate / Heat pump",
   "Thermostat / Heizung": "Thermostat / Heating",
@@ -1271,6 +1274,14 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           </select>
         </label>
 
+        <label class="field">
+          <div class="label">${this._t("Temperatur-Einheit")}</div>
+          <select id="temperature_unit">
+            <option value="auto">Auto / Home Assistant</option>
+            <option value="celsius">${this._t("Celsius (°C)")}</option>
+            <option value="fahrenheit">${this._t("Fahrenheit (°F)")}</option>
+          </select>
+        </label>
         <div id="fields"></div>
 
         <div id="numbers"></div>
@@ -1290,6 +1301,9 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
     languageSelect.addEventListener("change", ev => {
       this._fireChanged("language", ev.target.value);
     });
+    const temperatureSelect = this.shadowRoot.querySelector("#temperature_unit");
+    temperatureSelect.value = this._config.temperature_unit || "auto";
+    temperatureSelect.addEventListener("change", ev => this._fireChanged("temperature_unit", ev.target.value));
 
     const fields = this.shadowRoot.querySelector("#fields");
     const add = el => fields.appendChild(el);
