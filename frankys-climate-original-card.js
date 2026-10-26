@@ -1066,30 +1066,56 @@ class JarvisClimateCardLegacy extends HTMLElement {
           <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ffd93e" stroke-width="18" stroke-linecap="round"/>
           <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#fff8c0" stroke-width="9" stroke-linecap="round"/>
         `:""}
-        <circle cx="${g.cx}" cy="${g.cy}" r="170" fill="url(#dialFace)" stroke="#070d15" stroke-width="6"/>
-        <circle cx="${g.cx}" cy="${g.cy}" r="169" fill="none" stroke="#a3b0ba" stroke-width="1" stroke-opacity=".66"/>
-        <path d="M522 241 A171 171 0 0 1 788 243" fill="none" stroke="#d2e4eb" stroke-width="6" stroke-opacity=".11"/>
-        <g transform="translate(620 189)" fill="none" stroke-linecap="round">
-          <g stroke="#ff8420" stroke-width="9" opacity="${heaterOn?".82":".0"}" filter="url(#softGlow)">
-            <path d="M0 43 C30 17-18 13 10-12"/><path d="M29 43 C59 17 11 13 39-12"/><path d="M58 43 C88 17 40 13 68-12"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="170" fill="#01060b" stroke="#050a12" stroke-width="6"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="168" fill="url(#dialFace)"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="167" fill="url(#steelBrush)" opacity=".70"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="168" fill="url(#faceHighlight)"/>
+        <g clip-path="url(#dialClip)">
+          <path d="M498 258 Q549 142 695 154 Q600 158 524 285Z" fill="#e0f3ff" opacity=".11"/>
+          <path d="M498 256 Q565 148 655 152" stroke="#e0f5ff" fill="none" stroke-width="11" opacity=".13"/>
+          <path d="M490 292 Q508 214 570 172" stroke="#c9eafa" fill="none" stroke-width="5" opacity=".12"/>
+          <path d="M517 416 Q562 470 635 485" stroke="#f49a41" fill="none" stroke-width="8" opacity=".08"/>
+        </g>
+        ${Array.from({length:18},(_,i)=>`<circle cx="655" cy="320" r="${98+i*3.4}" fill="none" stroke="#cfe7f9" stroke-width=".36" opacity=".033"/>`).join("")}
+        <circle cx="${g.cx}" cy="${g.cy}" r="169" fill="none" stroke="#a3b0ba" stroke-width="1.2" stroke-opacity=".66"/>
+        <path d="M522 241 A171 171 0 0 1 788 243" fill="none" stroke="#d2e4eb" stroke-width="5" stroke-opacity=".26"/>
+        <path d="M778 430 A171 171 0 0 1 583 474" fill="none" stroke="#ffbd65" stroke-width="2" stroke-opacity=".38"/>
+        <g transform="translate(608 179)">
+          <g fill="${heaterOn?"url(#flameFill)":"#50606d"}" opacity="${heaterOn?".86":".44"}" filter="url(#softGlow)">
+            <path d="M9 60C22 43 4 34 14 13Q18 6 25 0C16 24 38 33 26 51Q19 59 9 60Z"/>
+            <path d="M42 60C55 43 37 34 47 13Q51 6 58 0C49 24 71 33 59 51Q52 59 42 60Z"/>
+            <path d="M75 60C88 43 70 34 80 13Q84 6 91 0C82 24 104 33 92 51Q85 59 75 60Z"/>
           </g>
-          <g stroke="${heaterOn?"#ffb341":"#52606b"}" stroke-width="6.5">
-            <path d="M0 43 C30 17-18 13 10-12"/><path d="M29 43 C59 17 11 13 39-12"/><path d="M58 43 C88 17 40 13 68-12"/>
+          <g fill="${heaterOn?"url(#flameFill)":"#62707a"}">
+            <path d="M9 60C22 43 4 34 14 13Q18 6 25 0C16 24 38 33 26 51Q19 59 9 60Z"/>
+            <path d="M42 60C55 43 37 34 47 13Q51 6 58 0C49 24 71 33 59 51Q52 59 42 60Z"/>
+            <path d="M75 60C88 43 70 34 80 13Q84 6 91 0C82 24 104 33 92 51Q85 59 75 60Z"/>
           </g>
         </g>
         ${this._config.flame_switch_entity && mode!=="AUS" ? `<rect class="hit" data-action="flame" x="598" y="165" width="121" height="91"/>` : ""}
         <text x="655" y="294" fill="#e2f5ff" font-size="24" font-weight="500" text-anchor="middle">${this._t("target")}</text>
-        <text data-slider-value x="647" y="369" fill="#ff9c2a" font-size="82" font-weight="700" text-anchor="middle">${this._fmtTemp(target)}</text>
+        <text data-slider-value x="647" y="369" fill="#ffa329" font-size="82" font-weight="700" text-anchor="middle" style="filter:drop-shadow(0 1px 6px rgba(255,94,8,.62))" stroke="#ff6713" stroke-width=".5" paint-order="stroke fill">${this._fmtTemp(target)}</text>
         <text x="756" y="326" fill="#ffbd6b" font-size="27" font-weight="600">${this._displayTempUnit()}</text>
         <text x="655" y="417" fill="#92bbcc" font-size="14" text-anchor="middle">${safeStatus}</text>
         <path data-slider d="${g.arc}" fill="none" stroke="transparent" stroke-width="55" style="pointer-events:stroke;touch-action:none;cursor:pointer"/>
-        <circle cx="561" cy="485" r="59" fill="#008efb" opacity=".26" filter="url(#neonBlur)"/>
+        <ellipse cx="561" cy="486" rx="74" ry="70" fill="url(#blueHalo)" opacity=".85"/>
+        <circle cx="561" cy="485" r="59" fill="#008efb" opacity=".48" filter="url(#neonBlur)"/>
+        <circle cx="561" cy="485" r="57.4" fill="#040c15" stroke="#026594" stroke-width="4"/>
         <circle cx="561" cy="485" r="54" fill="url(#blueButton)" stroke="#14d3ff" stroke-width="2.2"/>
+        <circle cx="561" cy="485" r="52" fill="url(#buttonTopHighlight)" opacity=".72"/>
+        <path d="M511 472 A52 52 0 0 1 593 442" fill="none" stroke="#e5faff" stroke-width="2.2" opacity=".65"/>
+        <path d="M532 528 A52 52 0 0 0 598 519" fill="none" stroke="#20bfff" stroke-width="4" opacity=".7"/>
         <circle cx="561" cy="485" r="47" fill="none" stroke="#c0f0ff" stroke-opacity=".35" stroke-width="1"/>
         <path d="M543 485H579" stroke="#effbff" stroke-linecap="round" stroke-width="8"/>
         <circle class="hit" data-action="minus" cx="561" cy="485" r="54"/>
-        <circle cx="748" cy="485" r="59" fill="#ff6d00" opacity=".32" filter="url(#neonBlur)"/>
+
+        <ellipse cx="748" cy="485" rx="74" ry="70" fill="url(#amberHalo)" opacity=".9"/>
+        <circle cx="748" cy="485" r="59" fill="#ff6d00" opacity=".47" filter="url(#neonBlur)"/>
+        <circle cx="748" cy="485" r="57.4" fill="#100906" stroke="#b84709" stroke-width="4"/>
         <circle cx="748" cy="485" r="54" fill="url(#orangeButton)" stroke="#ff890f" stroke-width="2.2"/>
+        <circle cx="748" cy="485" r="52" fill="url(#buttonTopHighlight)" opacity=".61"/>
+        <path d="M700 465 A52 52 0 0 1 783 448" fill="none" stroke="#ffe9b9" stroke-width="2.3" opacity=".69"/>
+        <path d="M713 523 A52 52 0 0 0 788 517" fill="none" stroke="#ff8b19" stroke-width="4.5" opacity=".8"/>
         <circle cx="748" cy="485" r="47" fill="none" stroke="#ffe0ab" stroke-opacity=".44" stroke-width="1"/>
         <path d="M730 485H766M748 467V503" stroke="#fff6ef" stroke-linecap="round" stroke-width="8"/>
         <circle class="hit" data-action="plus" cx="748" cy="485" r="54"/>
