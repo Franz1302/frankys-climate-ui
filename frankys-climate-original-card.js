@@ -835,6 +835,18 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const canMode = m => !!this._config.mode_entity || this._hasModeAction(m) ||
       (Array.isArray(modes) && modes.includes({AUS:"off",AUTO:"auto",MANUELL:"heat"}[m]));
     const g = this._dialGeometry(target, actual);
+    // Decorative radial marks: the dial math and Home Assistant behavior stay unchanged.
+    const accentTicks = Array.from({length: 51}, (_, i) => {
+      const a = (135 + 270 * i / 50) * Math.PI / 180;
+      const major = i % 10 === 0;
+      const radius0 = major ? 236 : 243;
+      const radius1 = major ? 248 : 250;
+      const color = i < 17 ? "#18bfff" : i < 31 ? "#f8ce31" : i < 43 ? "#ff9627" : "#fb4051";
+      const x1 = g.cx + radius0 * Math.cos(a), y1 = g.cy + radius0 * Math.sin(a);
+      const x2 = g.cx + radius1 * Math.cos(a), y2 = g.cy + radius1 * Math.sin(a);
+      return `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"
+        stroke="${color}" stroke-width="${major?3.8:2}" stroke-linecap="round" opacity="${major?.98:.78}"/>`;
+    }).join("");
     const safeName = this._escape(this._config.name || "Klima");
     const safeStatus = this._escape(this._error || (this._pending ? this._t("sending") :
       (mode === "UNAVAILABLE" || statusUnavailable) ? this._t("unavailable") :
@@ -1024,19 +1036,35 @@ class JarvisClimateCardLegacy extends HTMLElement {
 <path d="M342 93 V541 M969 120 V508" fill="none" stroke="#39c5ff" stroke-opacity=".19" stroke-width="1.5"/>
 <path d="M646 604 H798" stroke="#ff9b30" stroke-width="4" stroke-opacity=".58" filter="url(#softGlow)"/>
       <g transform="translate(0 24)">
+        <circle cx="${g.cx}" cy="${g.cy}" r="207" fill="#00040b" opacity=".94" filter="url(#deepShadow)"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="204" fill="none" stroke="#a6ceda" stroke-opacity=".37" stroke-width="1.4"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="201" fill="none" stroke="#020913" stroke-width="7"/>
         <circle cx="${g.cx}" cy="${g.cy}" r="198" fill="#020811" stroke="#091926" stroke-width="18" filter="url(#deepShadow)"/>
-        <circle cx="${g.cx}" cy="${g.cy}" r="194" fill="none" stroke="url(#polishedMetal)" stroke-width="13"/>
-        <circle cx="${g.cx}" cy="${g.cy}" r="185" fill="none" stroke="#b8d0dc" stroke-opacity=".62" stroke-width="1.2"/>
-        <circle cx="${g.cx}" cy="${g.cy}" r="176" fill="none" stroke="#0d1d27" stroke-width="8"/>
-        <path d="${g.arc}" fill="none" stroke="url(#arcGradient)" stroke-width="26" stroke-linecap="round" opacity=".67" filter="url(#neonBlur)"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="195" fill="none" stroke="url(#rimSteel)" stroke-width="14"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="195" fill="none" stroke="url(#steelBrush)" stroke-width="10" opacity=".55"/>
+        <path d="M476 237 A195 195 0 0 1 633 126" fill="none" stroke="#eafaff" stroke-width="3" opacity=".73"/>
+        <path d="M674 125 A195 195 0 0 1 839 268" fill="none" stroke="#ffd19a" stroke-width="3" opacity=".48"/>
+        <path d="M844 274 A195 195 0 0 1 810 437" fill="none" stroke="#ff9122" stroke-width="5" opacity=".52"/>
+        <path d="M539 478 A195 195 0 0 0 760 486" fill="none" stroke="#f6a849" stroke-width="3" opacity=".63"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="188" fill="none" stroke="#03060e" stroke-width="5"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="185" fill="none" stroke="url(#rimKnife)" stroke-opacity=".92" stroke-width="2.4"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="182" fill="none" stroke="#e6fbff" stroke-opacity=".31" stroke-width=".8"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="178" fill="none" stroke="url(#rimSteel)" stroke-width="7" opacity=".75"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="174" fill="none" stroke="#040914" stroke-width="5"/>
+        <circle cx="${g.cx}" cy="${g.cy}" r="172" fill="none" stroke="#dae9ec" stroke-opacity=".54" stroke-width="1"/>
+        <path d="${g.arc}" fill="none" stroke="url(#arcGradient)" stroke-width="32" stroke-linecap="round" opacity=".91" filter="url(#neonBlur)"/>
+        <path d="${g.arc}" fill="none" stroke="url(#arcGradient)" stroke-width="19" stroke-linecap="round" opacity=".30" filter="url(#softGlow)"/>
         <path d="${g.arc}" fill="none" stroke="#04131c" stroke-width="22" stroke-linecap="round"/>
-        <path d="${g.arc}" fill="none" stroke="url(#arcGradient)" stroke-width="13.5" stroke-linecap="round"/>
-        ${g.ticks}${g.labels}
+        <path d="${g.arc}" fill="none" stroke="url(#arcGradient)" stroke-width="16.5" stroke-linecap="round"/>
+        <path d="${g.arc}" fill="none" stroke="#fffad5" stroke-opacity=".14" stroke-width="2" stroke-linecap="round"/>
+        ${g.ticks}${accentTicks}${g.labels}
         ${Number.isFinite(actual)?`<circle cx="${g.currentMarker.x}" cy="${g.currentMarker.y}" r="7" fill="#e4fbff" stroke="#08bffa" stroke-width="3"/>`:""}
         ${Number.isFinite(target)?`
-          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ff630a" stroke-width="31" stroke-linecap="round" opacity=".78" filter="url(#softGlow)"/>
-          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ff7d04" stroke-width="25" stroke-linecap="round"/>
-          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#fff0a5" stroke-width="14" stroke-linecap="round"/>
+          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ff4900" stroke-width="37" stroke-linecap="round" opacity=".88" filter="url(#neonBlur)"/>
+          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#160907" stroke-width="32" stroke-linecap="round"/>
+          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ff7112" stroke-width="28" stroke-linecap="round"/>
+          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ffd93e" stroke-width="18" stroke-linecap="round"/>
+          <line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#fff8c0" stroke-width="9" stroke-linecap="round"/>
         `:""}
         <circle cx="${g.cx}" cy="${g.cy}" r="170" fill="url(#dialFace)" stroke="#070d15" stroke-width="6"/>
         <circle cx="${g.cx}" cy="${g.cy}" r="169" fill="none" stroke="#a3b0ba" stroke-width="1" stroke-opacity=".66"/>
