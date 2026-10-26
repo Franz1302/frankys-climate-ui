@@ -430,7 +430,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const cfg = this._config.min_temp;
     const climateMin = this._num(attr, this._nativeTempUnit() === "°F" ? 41 : 5);
     const helper = this._config.target_entity && this._state(this._config.target_entity);
-    const helperMin = helper && helper.attributes && helper.attributes.min;
+    const helperMin = helper && helper.attributes ? helper.attributes.min : undefined;
     const bounded = helperMin !== undefined && helperMin !== null && Number.isFinite(Number(helperMin))
       ? Math.max(climateMin, this._toNativeTemp(Number(helperMin), this._sourceTempUnit(this._config.target_entity))) : climateMin;
     return cfg === null || cfg === undefined || cfg === "" ? bounded : this._num(cfg, bounded);
@@ -441,7 +441,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const cfg = this._config.max_temp;
     const climateMax = this._num(attr, this._nativeTempUnit() === "°F" ? 95 : 35);
     const helper = this._config.target_entity && this._state(this._config.target_entity);
-    const helperMax = helper && helper.attributes && helper.attributes.max;
+    const helperMax = helper && helper.attributes ? helper.attributes.max : undefined;
     const bounded = helperMax !== undefined && helperMax !== null && Number.isFinite(Number(helperMax))
       ? Math.min(climateMax, this._toNativeTemp(Number(helperMax), this._sourceTempUnit(this._config.target_entity))) : climateMax;
     return cfg === null || cfg === undefined || cfg === "" ? bounded : this._num(cfg, bounded);
