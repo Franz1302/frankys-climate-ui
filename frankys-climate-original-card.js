@@ -857,6 +857,9 @@ class JarvisClimateCardLegacy extends HTMLElement {
         ${active ? `<rect x="63" y="${y-3}" width="249" height="66" rx="19" fill="none" stroke="${stroke}" stroke-width="5" opacity=".52" filter="url(#neonBlur)"/>` : ""}
         <rect x="65" y="${y}" width="245" height="59" rx="18" fill="${fill}" stroke="${stroke}" stroke-width="${active?2.2:1.4}"/>
         <path d="M80 ${y+3}H295" stroke="#dffbff" stroke-opacity="${active?".58":".14"}" stroke-width="1.1"/>
+<path d="M70 ${y+35} V ${y+26} Q70 ${y+7} 89 ${y+6} H286" fill="none" stroke="#c1f1ff" stroke-opacity="${active?".26":".12"}" stroke-width="1.2"/>
+<path d="M83 ${y+57} H291" stroke="${active?"#50dfff":"#f28a63"}" stroke-opacity="${active?".56":".12"}" stroke-width="1.2"/>
+<path d="M290 ${y+8} Q305 ${y+10} 306 ${y+25}" fill="none" stroke="#91e5ff" stroke-opacity="${active?".42":".12"}" stroke-width="1.4"/>
         ${fan}
         <text x="200" y="${y+38}" fill="${color}" font-family="Arial,sans-serif" font-size="${m==="MANUELL"?22:26}" font-weight="600" text-anchor="middle">${this._modeDisplay(m)}</text>
         ${enabled ? `<rect class="hit" data-action="mode" data-mode="${m}" x="65" y="${y}" width="245" height="59" rx="18" />`: ""}
@@ -926,7 +929,48 @@ class JarvisClimateCardLegacy extends HTMLElement {
         <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stop-color="#fb2e0b"/><stop offset="50%" stop-color="#ffb223"/><stop offset="100%" stop-color="#ff4000"/>
         </linearGradient>
-        <filter id="neonBlur" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
+        <linearGradient id="rimSteel" x1="10%" y1="8%" x2="92%" y2="93%">
+<stop offset="0%" stop-color="#101b29"/><stop offset="12%" stop-color="#c3edff"/>
+<stop offset="20%" stop-color="#193b4d"/><stop offset="31%" stop-color="#f3fbff"/>
+<stop offset="36%" stop-color="#183046"/><stop offset="47%" stop-color="#080e18"/>
+<stop offset="70%" stop-color="#102435"/><stop offset="81%" stop-color="#f9a148"/>
+<stop offset="89%" stop-color="#31201d"/><stop offset="96%" stop-color="#e2a763"/>
+<stop offset="100%" stop-color="#08131d"/></linearGradient>
+<linearGradient id="rimKnife" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#eaf8fe"/><stop offset="26%" stop-color="#4e748b"/>
+<stop offset="49%" stop-color="#0b1e2b"/><stop offset="76%" stop-color="#ffaf57"/>
+<stop offset="100%" stop-color="#131723"/></linearGradient>
+<linearGradient id="verticalSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+<stop offset="0%" stop-color="#f4feff" stop-opacity=".20"/>
+<stop offset="13%" stop-color="#e7fbff" stop-opacity=".055"/>
+<stop offset="48%" stop-color="#e7fbff" stop-opacity="0"/>
+<stop offset="88%" stop-color="#ff9b36" stop-opacity=".018"/>
+<stop offset="100%" stop-color="#ff894c" stop-opacity=".10"/></linearGradient>
+<linearGradient id="topSpecular" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#65cfff" stop-opacity="0"/>
+<stop offset="7%" stop-color="#a4edff" stop-opacity=".9"/>
+<stop offset="24%" stop-color="#bbf5ff" stop-opacity=".25"/>
+<stop offset="47%" stop-color="#e9fcff" stop-opacity=".02"/>
+<stop offset="75%" stop-color="#72dfff" stop-opacity=".23"/>
+<stop offset="96%" stop-color="#95e8ff" stop-opacity=".89"/>
+<stop offset="100%" stop-color="#e3faff" stop-opacity="0"/></linearGradient>
+<radialGradient id="faceHighlight" cx="27%" cy="11%" r="86%">
+<stop offset="0%" stop-color="#d1e9fc" stop-opacity=".24"/>
+<stop offset="26%" stop-color="#cee8f9" stop-opacity=".075"/>
+<stop offset="62%" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+<radialGradient id="buttonTopHighlight" cx="24%" cy="9%" r="70%">
+<stop offset="0%" stop-color="#f5ffff" stop-opacity=".52"/>
+<stop offset="22%" stop-color="#dbf7ff" stop-opacity=".18"/>
+<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+<linearGradient id="flameFill" x1="0%" y1="100%" x2="100%" y2="0%">
+<stop offset="0%" stop-color="#ff3d08"/><stop offset="39%" stop-color="#ff930c"/>
+<stop offset="70%" stop-color="#fff070"/><stop offset="100%" stop-color="#ff6b06"/></linearGradient>
+<radialGradient id="blueHalo"><stop offset="0%" stop-color="#00baff" stop-opacity=".36"/><stop offset="100%" stop-color="#00aeff" stop-opacity="0"/></radialGradient>
+<radialGradient id="amberHalo"><stop offset="0%" stop-color="#ff7d11" stop-opacity=".36"/><stop offset="100%" stop-color="#ff6e00" stop-opacity="0"/></radialGradient>
+<pattern id="steelBrush" patternUnits="userSpaceOnUse" width="4" height="4">
+<path d="M0 1H4 M0 3H4" stroke="#d8f1ff" stroke-opacity=".048" stroke-width=".42"/></pattern>
+<clipPath id="dialClip"><circle cx="655" cy="320" r="169"/></clipPath>
+<filter id="neonBlur" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="6"/></filter>
         <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3"/></filter>
         <filter id="deepShadow" x="-65%" y="-65%" width="230%" height="230%">
           <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity=".82"/>
@@ -937,10 +981,17 @@ class JarvisClimateCardLegacy extends HTMLElement {
         <rect x="12" y="12" width="976" height="616" rx="31" fill="#00caff" opacity=".26" filter="url(#neonBlur)"/>
         <rect x="12" y="12" width="976" height="616" rx="30" fill="url(#outerBg)" stroke="#64cbff" stroke-width="1.9"/>
         <rect x="15" y="16" width="970" height="608" rx="27" fill="none" stroke="#defbff" stroke-opacity=".18" stroke-width="1"/>
+<rect x="12" y="12" width="976" height="616" rx="30" fill="none" stroke="url(#topSpecular)" stroke-width="2.3"/>
+<path d="M16 104 Q16 16 111 16 H899 Q984 16 984 100" fill="none" stroke="#e6faff" stroke-opacity=".14" stroke-width="1.1"/>
+<path d="M15 533 V577 Q15 624 67 624 M931 624 Q984 624 984 577 V538" fill="none" stroke="#2bdcff" stroke-opacity=".32" stroke-width="1.5"/>
+<path d="M21 435 V570 M979 80 V205" stroke="#ff7c17" stroke-width="4" stroke-opacity=".38" filter="url(#neonBlur)"/>
       `}
   
       <rect x="30" y="33" width="297" height="242" rx="19" fill="url(#warmGlass)" stroke="#87dafa" stroke-width="1.6"/>
-      <rect x="32" y="35" width="293" height="238" rx="17" fill="none" stroke="#ffffff" stroke-opacity=".14"/>
+      <rect x="32" y="35" width="293" height="238" rx="17" fill="url(#verticalSheen)" stroke="#ffffff" stroke-opacity=".14"/>
+<path d="M49 34 H304 M31 69 V235" fill="none" stroke="#e7faff" stroke-opacity=".36" stroke-width="1.3"/>
+<path d="M326 180 V238 Q326 273 293 274" fill="none" stroke="#ff5f0b" stroke-opacity=".64" stroke-width="2.4"/>
+<path d="M32 132 V224" fill="none" stroke="#ff860d" stroke-width="4" opacity=".65" filter="url(#softGlow)"/>
       <path d="M31 188V230 Q31 273 73 273 H300" fill="none" stroke="#ff6c13" stroke-width="3" opacity=".60" filter="url(#softGlow)"/>
       <g transform="translate(80 67)" fill="none" stroke-linecap="round" stroke-linejoin="round">
         <path d="M-9 10 V48 A17 17 0 1 0 9 48 V10 A9 9 0 0 0 -9 10 Z" stroke="#ff6413" stroke-width="7" filter="url(#softGlow)"/>
@@ -948,7 +999,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
         <path d="M0 25 V53" stroke="#ffb55b" stroke-width="5"/>
         <circle cx="0" cy="61" r="8" fill="#ff6f20" stroke="none"/>
       </g>
-      <text x="130" y="88" font-size="25" font-weight="500" fill="#eaf8ff">${this._t("actual")}</text>
+      <text x="130" y="88" font-size="24" font-weight="500" fill="#eaf8ff">${this._lang()==="de"?"Ist-Temperatur":"Current temperature"}</text>
       <text x="186" y="203" font-size="81" font-weight="600" text-anchor="middle" fill="#eaf7ff">${this._fmtTemp(actual)}</text>
       <text x="285" y="163" font-size="31" font-weight="500" fill="#eaf7ff">${this._displayTempUnit()}</text>
       <path d="M31 252 C105 198 150 282 220 240 S299 220 326 201" fill="none" stroke="#ff4b00" stroke-width="9" filter="url(#neonBlur)" opacity=".58"/>
@@ -956,6 +1007,9 @@ class JarvisClimateCardLegacy extends HTMLElement {
       <g opacity=".68">${sparkline}</g>
   
       <rect x="30" y="291" width="297" height="314" rx="19" fill="url(#glass)" stroke="#78d9ff" stroke-width="1.6"/>
+<rect x="31.5" y="293" width="294" height="310" rx="17.5" fill="url(#verticalSheen)" stroke="#daf5ff" stroke-opacity=".18" stroke-width=".9"/>
+<path d="M38 293 H308 M31 318 V552" fill="none" stroke="#c1f6ff" stroke-opacity=".42" stroke-width="1.3"/>
+<path d="M326 558 V580 Q326 603 300 604" fill="none" stroke="#ff6c14" stroke-opacity=".6" stroke-width="2"/>
       <path d="M30 566V582 Q30 604 54 604 H300" fill="none" stroke="#f86b1c" stroke-opacity=".7" stroke-width="2" filter="url(#softGlow)"/>
       <g transform="translate(81 337)" stroke="#05ddff" fill="none" stroke-width="2.6">
         <circle r="17"/><circle r="7"/>
@@ -965,7 +1019,10 @@ class JarvisClimateCardLegacy extends HTMLElement {
       ${buttons}
   
       <rect x="340" y="33" width="630" height="572" rx="19" fill="url(#glass)" stroke="#8fdfff" stroke-width="1.45"/>
-      <path d="M358 34 H952" stroke="#c4f6ff" stroke-width="1.2" opacity=".35"/>
+      <rect x="341.5" y="34.5" width="627" height="569" rx="17.5" fill="url(#verticalSheen)" stroke="#e6faff" stroke-opacity=".10" stroke-width=".8"/>
+<path d="M358 34 H952" stroke="#c4f6ff" stroke-width="1.2" opacity=".55"/>
+<path d="M342 93 V541 M969 120 V508" fill="none" stroke="#39c5ff" stroke-opacity=".19" stroke-width="1.5"/>
+<path d="M646 604 H798" stroke="#ff9b30" stroke-width="4" stroke-opacity=".58" filter="url(#softGlow)"/>
       <g transform="translate(0 24)">
         <circle cx="${g.cx}" cy="${g.cy}" r="198" fill="#020811" stroke="#091926" stroke-width="18" filter="url(#deepShadow)"/>
         <circle cx="${g.cx}" cy="${g.cy}" r="194" fill="none" stroke="url(#polishedMetal)" stroke-width="13"/>
