@@ -54,8 +54,22 @@ function make(extra={}){
  render.c._temperatureHistory=[];
  render.c._bindSlider=()=>{};
  render.c._render=Card.prototype._render;
- render.c.clientWidth=1300; // Desktop viewbox in Node's minimal HTMLElement mock.
+ render.c.clientWidth=1300;
  render.c._render();
+ // All components must stay in ONE proportional SVG, including on small mobile views.
+ for (const width of [320, 390, 540, 600, 740, 1300]) {
+   render.c.clientWidth=width;
+   render.c._render();
+   const html=render.c.shadowRoot.innerHTML;
+   assert.equal((html.match(/<svg\b/g)||[]).length,1,`Expected one SVG at ${width}px`);
+   assert.equal((html.match(/class="cell"/g)||[]).length,1,`Expected one sizing cell at ${width}px`);
+   assert(html.includes('viewBox="40 94 1370 870"'),`Stable uncropped viewbox at ${width}px`);
+   assert(html.includes('padding-bottom:63.504%'),`Fixed 1370:870 aspect ratio at ${width}px`);
+   assert(html.includes('data-action="plus"') && html.includes('data-action="minus"'),`Dial controls retained at ${width}px`);
+   assert(html.includes('data-action="mode"'),`Mode controls retained at ${width}px`);
+   assert(html.includes('data-title="actual"') && html.includes('data-title="mode"'),`Temperature/mode panels retained at ${width}px`);
+ }
+ assert(!source.includes('NARROW_PX') && !source.includes('const body = narrow'),'No breakpoint-based panel stacking');
  assert(render.c.shadowRoot.innerHTML.includes('data-slider'));
  assert(render.c.shadowRoot.innerHTML.includes('data-ring-depth'),'3D ring artwork present');
  assert(render.c.shadowRoot.innerHTML.includes('-12 h'),'12h Recorder time axis present');
@@ -72,7 +86,7 @@ function make(extra={}){
  assert(render.c.shadowRoot.innerHTML.includes('data-heating'),'Flame should appear when sensor reports heating');
 
  // HUD border must not be clipped by a fixed-radius wrapper when the card is narrow.
- assert(source.includes('.cell{position:relative;width:100%;height:0;overflow:hidden}'),'Responsive stacked SVG cells present');
+ assert(source.includes('.cell{position:relative;width:100%;height:0;overflow:hidden}'),'One responsive SVG sizing cell present');
  assert(!source.includes('overflow:hidden;border-radius:22px'));
 
  // Language and display units change formatting but never change HA's native value.
