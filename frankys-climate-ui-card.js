@@ -140,7 +140,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
 
   getCardSize() { return 6; }
-  getGridOptions() { return { columns: 12, min_columns: 12, rows: "auto" }; }
+  getGridOptions() { return { columns: 12, min_columns: 3, rows: 6, min_rows: 2 }; }
   _state(id) { return id && this._hass && this._hass.states ? this._hass.states[id] : undefined; }
   _num(v, fallback = NaN) { const n = Number(v); return Number.isFinite(n) ? n : fallback; }
   _unit(value) {
@@ -1716,15 +1716,15 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const label = this._escape(this._config.name || "Klima");
         // Exactly one proportional SVG/card at every width. Let viewBox and 100%-wide CSS scale
         // dial, temperature/history panel and mode controls together; never stack/crop panels.
-        const body = `<div class="cell" style="padding-bottom:63.504%"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="40 94 1370 870" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${this._defsMarkup()}<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>${this._leftMarkup()}${this._dialMarkup()}</svg></div>`;
+        const body = `<div class="cell"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="40 94 1370 870" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${this._defsMarkup()}<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>${this._leftMarkup()}${this._dialMarkup()}<text data-room-name x="940" y="185" text-anchor="middle" font-size="30" font-weight="600" fill="#d3efff" pointer-events="none"${label.length > 28 ? ' textLength="560" lengthAdjust="spacingAndGlyphs"' : ""}>${label}</text></svg></div>`;
         // Avoid costly redraws: the existing SVG scales natively on resize without JS rerender.
         const signature = [label, href.length, href.slice(0, 64), body.replace(href, "")].join("|");
         if (signature === this._renderSignature && this.shadowRoot.firstElementChild) return;
         this._renderSignature = signature;
         this.renderCount = (this.renderCount || 0) + 1;
         this.shadowRoot.innerHTML = `<style>
-        :host{display:block;width:100%;max-width:100%}.hybrid-frame{width:100%;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-        .cell{position:relative;width:100%;height:0;overflow:hidden}
+        :host{display:block;width:100%;max-width:100%;height:100%}.hybrid-frame{width:100%;height:100%;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+        .cell{position:relative;width:100%;height:100%;aspect-ratio:1370/870;overflow:hidden}
         svg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;overflow:hidden;font-family:Arial,Helvetica,sans-serif}
         .hit{fill:transparent;cursor:pointer;pointer-events:all;touch-action:manipulation}
         .hit:focus{outline:none;stroke:#fff;stroke-width:2}.hit:hover{fill:#ffffff10}.key:active{fill:#00000055}

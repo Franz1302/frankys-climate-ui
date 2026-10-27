@@ -64,7 +64,7 @@ function make(extra={}){
    assert.equal((html.match(/<svg\b/g)||[]).length,1,`Expected one SVG at ${width}px`);
    assert.equal((html.match(/class="cell"/g)||[]).length,1,`Expected one sizing cell at ${width}px`);
    assert(html.includes('viewBox="40 94 1370 870"'),`Stable uncropped viewbox at ${width}px`);
-   assert(html.includes('padding-bottom:63.504%'),`Fixed 1370:870 aspect ratio at ${width}px`);
+   assert(html.includes('aspect-ratio:1370/870'),`Intrinsic 1370:870 aspect ratio at ${width}px`);
    assert(html.includes('data-action="plus"') && html.includes('data-action="minus"'),`Dial controls retained at ${width}px`);
    assert(html.includes('data-action="mode"'),`Mode controls retained at ${width}px`);
    assert(html.includes('data-title="actual"') && html.includes('data-title="mode"'),`Temperature/mode panels retained at ${width}px`);
@@ -78,7 +78,12 @@ function make(extra={}){
  render.c._config.name='SCHLAFZIMMER';
  render.c._render();
  assert(render.c.shadowRoot.innerHTML.includes('OFF</text>'),'OFF label must remain visible');
- assert(render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER'),'Card name is used as an accessible SVG label');
+ assert.match(render.c.shadowRoot.innerHTML, /<text data-room-name[^>]*>SCHLAFZIMMER<\/text>/,'Room name must be visible, not only an accessible label');
+ assert(render.c.shadowRoot.innerHTML.includes('aria-label="SCHLAFZIMMER"'));
+ render.c._config.name='Bad & <Spa> "OG"';
+ render.c._render();
+ assert.match(render.c.shadowRoot.innerHTML, /<text data-room-name[^>]*>Bad &amp; &lt;Spa&gt; &quot;OG&quot;<\/text>/);
+ render.c._config.name='SCHLAFZIMMER';
  assert(!render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER ·'),'No duplicate old title');
  // Explicit heating sensor takes precedence over hvac_action in this configuration.
  render.states['binary_sensor.heating'].state='on';
@@ -86,7 +91,10 @@ function make(extra={}){
  assert(render.c.shadowRoot.innerHTML.includes('data-heating'),'Flame should appear when sensor reports heating');
 
  // HUD border must not be clipped by a fixed-radius wrapper when the card is narrow.
- assert(source.includes('.cell{position:relative;width:100%;height:0;overflow:hidden}'),'One responsive SVG sizing cell present');
+ assert(source.includes('.cell{position:relative;width:100%;height:100%;aspect-ratio:1370/870;overflow:hidden}'),'Responsive cell fits allocated height with intrinsic aspect ratio fallback');
+ const grid=render.c.getGridOptions();
+ assert(grid.min_columns < grid.columns,'Sections width must be resizable');
+ assert(Number.isFinite(grid.rows) && grid.min_rows < grid.rows,'Sections height must be resizable');
  assert(!source.includes('overflow:hidden;border-radius:22px'));
 
  // Language and display units change formatting but never change HA's native value.

@@ -38,7 +38,8 @@ No migration, new resource, or additional HACS repository is required. A normal 
 - Visual card editor with **language** selection: Auto (Home Assistant), Deutsch, English. Number formatting follows the selected language (21,5 / 21.5).
 - **Temperature units**: Auto (Home Assistant), Celsius (°C) or Fahrenheit (°F). Readings, setpoint, ring tick labels and schedule info use the chosen unit, while service calls retain their actual source entity units.
 - Proportional SVG scaling without clipping the HUD's rounded corners when resized.
-- **v0.1.2:** Home Assistant Sections cards now request 12 columns and automatic intrinsic height, preventing squeezed/overlapping dashboard rows. Explicit dashboard `grid_options.rows` values still override this default.
+- Home Assistant Sections cards default to 12 columns and 6 rows and can be resized down to 3 columns and 2 rows. The complete artwork fits proportionally inside the selected size; spare space is left when the container has a different aspect ratio. Masonry cards and explicit `grid_options.rows: auto` retain intrinsic proportional height.
+- The configured `name` is visible above the thermostat ring and is also retained as its accessible label.
 
 ## Configuration
 
