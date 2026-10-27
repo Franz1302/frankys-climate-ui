@@ -80,6 +80,9 @@ function make(extra={}){
  assert(render.c.shadowRoot.innerHTML.includes('OFF</text>'),'OFF label must remain visible');
  assert.match(render.c.shadowRoot.innerHTML, /<text data-room-name[^>]*>SCHLAFZIMMER<\/text>/,'Room name must be visible, not only an accessible label');
  assert(render.c.shadowRoot.innerHTML.includes('aria-label="SCHLAFZIMMER"'));
+ assert(render.c.shadowRoot.innerHTML.includes('data-room-name x="208" y="224"'),'Room name starts in the upper-left temperature panel');
+ assert(render.c.shadowRoot.innerHTML.includes('font-size="48" font-weight="700" fill="#e2f7ff"'),'Room name is large and prominent');
+ assert(render.c.shadowRoot.innerHTML.includes('data-title="actual" x="208" y="273" font-size="26"'),'Current-temperature caption is below room name');
  render.c._config.name='Bad & <Spa> "OG"';
  render.c._render();
  assert.match(render.c.shadowRoot.innerHTML, /<text data-room-name[^>]*>Bad &amp; &lt;Spa&gt; &quot;OG&quot;<\/text>/);
