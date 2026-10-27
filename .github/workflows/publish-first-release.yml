@@ -16,17 +16,17 @@ jobs:
       github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Publish v0.2.3 after successful validation
+      - name: Publish v0.2.4 after successful validation
         env:
           GH_TOKEN: ${{ github.token }}
           VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          if gh release view v0.2.3 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release v0.2.3 already exists."
+          if gh release view v0.2.4 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v0.2.4 already exists."
             exit 0
           fi
-          gh release create v0.2.3 \
+          gh release create v0.2.4 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$VERIFIED_SHA" \
-            --title "Franky's Climate UI v0.2.3" \
-            --notes "Place larger room names in the left temperature panel with the current-temperature caption below; preserve heating behavior and proportional climate-card layout."
+            --title "Franky's Climate UI v0.2.4" \
+            --notes "Add a clear weekly heating schedule editor with direct start/end and temperature fields, weekday copy, native Home Assistant schedule API persistence, and safe validation. Existing heater control stays unchanged."
