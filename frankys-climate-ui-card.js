@@ -1636,15 +1636,19 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       _schedAdd() {
         const rows = this._schedDraft[this._schedDay];
         const sorted = rows.slice().sort((a,b) => this._schedMinutes(a.from) - this._schedMinutes(b.from));
-        let start = 0, end = 0, clone = sorted[0];
+        let start = 480, end = 540, cursor = 0, foundGap = false, clone = sorted[0];
         for (const row of sorted) {
           const from = this._schedMinutes(row.from), to = this._schedMinutes(row.to);
-          if (from - end >= 30) { start = end; end = from; break; }
-          end = Math.max(end, to);
+          if (from - cursor >= 30) {
+            start = cursor; end = from; foundGap = true; break;
+          }
+          cursor = Math.max(cursor, to);
         }
-        if (start === end && 1440 - end >= 30) { start = end; end = 1440; }
-        if (start === end && sorted.length) {
-          // No gap: split the longest block to make room without creating an overlap.
+        if (!foundGap && 1440 - cursor >= 30) {
+          start = cursor; end = 1440; foundGap = true;
+        }
+        if (!foundGap && sorted.length) {
+          // No free space: split the longest existing interval instead of overlapping.
           const longest = sorted.slice().sort((a,b) =>
             (this._schedMinutes(b.to)-this._schedMinutes(b.from)) -
             (this._schedMinutes(a.to)-this._schedMinutes(a.from)))[0];
@@ -1655,7 +1659,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           longest.to = String(Math.floor(start/60)).padStart(2,"0")+":"+String(start%60).padStart(2,"0")+":00";
           clone = longest;
         }
-        if (start === end) { start = 480; end = 540; }
         const hm = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")+":00";
         const data = Object.assign({}, clone && clone.data || {}, {
           temperature: clone && clone.data && Number.isFinite(Number(clone.data.temperature))
