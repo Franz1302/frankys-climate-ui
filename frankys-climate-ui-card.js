@@ -1642,7 +1642,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const mode = this._mode(), actual = this._actualTemp();
         const canMode = m => !!this._config.mode_entity || this._hasModeAction(m) || (((this._controlState() || {}).attributes || {}).hvac_modes || []).includes({ AUS: "off", AUTO: "auto", MANUELL: "heat" }[m]);
         const de = this._lang() === "de";
-        return `${this._curveMarkup()}<text data-title="actual" x="208" y="225" font-size="34.8" fill="#eef4fa">${de ? "Ist-Temperatur" : "Current Temp."}</text>
+        return `${this._curveMarkup()}<text data-title="actual" x="208" y="273" font-size="26" fill="#aacbdc">${de ? "Ist-Temperatur" : "Current Temp."}</text>
         <text data-title="mode" x="225" y="545" font-size="34" fill="#d3efff">${de ? "Modus" : "Mode"}</text>
         <text data-actual x="287" y="371" text-anchor="middle" font-size="108" font-weight="600" letter-spacing="-4" fill="url(#cold)">${this._fmtTemp(actual)}</text>
         <text x="398" y="326" font-size="43" fill="#f0f6ff">${this._displayTempUnit()}</text>
@@ -1716,7 +1716,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const label = this._escape(this._config.name || "Klima");
         // Exactly one proportional SVG/card at every width. Let viewBox and 100%-wide CSS scale
         // dial, temperature/history panel and mode controls together; never stack/crop panels.
-        const body = `<div class="cell"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="40 94 1370 870" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${this._defsMarkup()}<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>${this._leftMarkup()}${this._dialMarkup()}<text data-room-name x="126" y="181" text-anchor="start" font-size="48" font-weight="700" fill="#e2f7ff" pointer-events="none"${label.length > 16 ? ' textLength="348" lengthAdjust="spacingAndGlyphs"' : ""}>${label}</text></svg></div>`;
+        const body = `<div class="cell"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="40 94 1370 870" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${this._defsMarkup()}<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>${this._leftMarkup()}${this._dialMarkup()}<text data-room-name x="208" y="224" text-anchor="start" font-size="48" font-weight="700" fill="#e2f7ff" pointer-events="none"${label.length > 11 ? ' textLength="275" lengthAdjust="spacingAndGlyphs"' : ""}>${label}</text></svg></div>`;
         // Avoid costly redraws: the existing SVG scales natively on resize without JS rerender.
         const signature = [label, href.length, href.slice(0, 64), body.replace(href, "")].join("|");
         if (signature === this._renderSignature && this.shadowRoot.firstElementChild) return;
