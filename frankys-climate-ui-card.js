@@ -1,5 +1,4 @@
-/* Franky's Climate UI — classic and hybrid JARVIS designs, single HACS card.
- * Both designs use one unmodified HA control/schedule/recorder engine. MIT License. */
+/* Franky's Climate UI — refreshed 3D glass/neon thermostat. One HACS card, same HA controls, helpers and editor. MIT License. */
 (function(){
 (function(){
   if (!Array.prototype.at) Array.prototype.at = function(n){ n = Math.trunc(n) || 0; if (n < 0) n += this.length; return this[n]; };
@@ -1357,7 +1356,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
 }
 
 
-/* Optional hybrid skin. Classic appearance remains the default for existing Lovelace configs. */
+/* New Climate UI design. Uses existing settings and HA climate/schedule/recorder control engine. */
 (() => {
   "use strict";
   const TAG = "frankys-climate-ui-card";
@@ -1408,15 +1407,13 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
   }
   const fmtLabel = v => String(clean(Math.round(v * 10) / 10));
 
-  // The original control logic and original editor stay in scope; only the presentation varies.
+  // Existing Home Assistant controls and editor settings remain in place.
   function install(Base, BaseEditor) {
     if (customElements.get(TAG)) return;
 
-    class FrankysClimateCardWithDesigns extends Base {
-      _isHybrid() { return !!this._config && this._config.design === "hybrid"; }
-
+    class FrankysClimateCard extends Base {
       static getStubConfig() {
-        return { ...super.getStubConfig(), design: "classic" };
+        return super.getStubConfig();
       }
 
       static getConfigElement() {
@@ -1447,14 +1444,14 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
 
       // Without a separate setpoint helper an empty target_entity must not turn into a 0 °C limit.
       _minTemp() {
-        if (!this._isHybrid() || this._config.target_entity) return super._minTemp();
+        if (this._config.target_entity) return super._minTemp();
         const ds = this._displayState(), cfg = this._config.min_temp;
         const climate = this._num(ds && ds.attributes ? ds.attributes.min_temp : undefined, this._nativeTempUnit() === "°F" ? 41 : 5);
         return cfg === null || cfg === undefined || cfg === "" ? climate : this._num(cfg, climate);
       }
 
       _maxTemp() {
-        if (!this._isHybrid() || this._config.target_entity) return super._maxTemp();
+        if (this._config.target_entity) return super._maxTemp();
         const ds = this._displayState(), cfg = this._config.max_temp;
         const climate = this._num(ds && ds.attributes ? ds.attributes.max_temp : undefined, this._nativeTempUnit() === "°F" ? 95 : 35);
         return cfg === null || cfg === undefined || cfg === "" ? climate : this._num(cfg, climate);
@@ -1482,7 +1479,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       }
 
       _sliderValue(event, slider, previousValue = NaN) {
-        if (!this._isHybrid()) return super._sliderValue(event, slider, previousValue);
         const matrix = slider.getScreenCTM();
         const svg = slider.ownerSVGElement;
         if (!matrix || !svg || !svg.createSVGPoint) return this._targetTemp();
@@ -1501,7 +1497,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       }
 
       _previewSlider(value) {
-        if (!this._isHybrid()) return super._previewSlider(value);
         if (!this._sliderDrag) return;
         this._sliderDrag.value = value;
         this.shadowRoot.querySelectorAll("[data-slider-value]").forEach(label => { label.textContent = this._fmtTemp(value); });
@@ -1739,10 +1734,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       }
 
       _render() {
-        if (!this._isHybrid()) {
-          this._renderSignature = null;
-          return super._render();
-        }
         if (!this._config || !this.shadowRoot || this._sliderDrag) return;
         const narrow = this._isNarrow();
         this._narrow = narrow;
@@ -1787,46 +1778,25 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       }
     }
     // The inherited editor is reused unchanged; it only guarantees that saved configs keep this card type.
-    class FrankysClimateCardEditorWithDesigns extends BaseEditor {
+    class FrankysClimateCardEditor extends BaseEditor {
       setConfig(config) {
         super.setConfig({ type: CARD_TYPE, ...config });
       }
 
-      // A design choice within the same card, not a second Lovelace card.
       _render() {
         super._render();
         const fields = this.shadowRoot && this.shadowRoot.querySelector("#fields");
-        if (!fields) return;
-        const isGerman = this._lang() === "de";
-        const field = document.createElement("label");
-        field.className = "field";
-        const title = document.createElement("span");
-        title.className = "label";
-        title.textContent = isGerman ? "Design" : "Appearance";
-        const select = document.createElement("select");
-        select.id = "design";
-        select.setAttribute("aria-label", title.textContent);
-        [["classic", isGerman ? "Klassisch (bisherige Ansicht)" : "Classic (existing layout)"],
-         ["hybrid", isGerman ? "Hybrid (3D-Glas/Neon)" : "Hybrid (3D glass/neon)"]].forEach(entry => {
-          const option = document.createElement("option");
-          option.value = entry[0]; option.textContent = entry[1]; select.appendChild(option);
-        });
-        select.value = this._config.design === "hybrid" ? "hybrid" : "classic";
-        select.addEventListener("change", event => this._fireChanged("design", event.target.value));
-        field.appendChild(title); field.appendChild(select);
-        fields.insertBefore(field, fields.firstChild);
-        // The pre-existing editor has an auto_hvac_mode field that was not in the form.
-        if (!this.shadowRoot.querySelector("#auto_hvac_mode")) fields.appendChild(this._autoModeField());
+        if (fields && !this.shadowRoot.querySelector("#auto_hvac_mode")) fields.appendChild(this._autoModeField());
       }
     }
-    customElements.define(TAG, FrankysClimateCardWithDesigns);
-    if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, FrankysClimateCardEditorWithDesigns);
+    customElements.define(TAG, FrankysClimateCard);
+    if (!customElements.get(EDITOR_TAG)) customElements.define(EDITOR_TAG, FrankysClimateCardEditor);
     window.customCards = window.customCards || [];
     if (!window.customCards.some(card => card.type === TAG)) {
       window.customCards.push({
         type: TAG,
         name: "Franky's Climate UI",
-        description: "Thermostat mit klassischem oder 3D-Neon-Hybrid-Design",
+        description: "3D-Glas-Thermostat mit 12-Stunden-Heizlinie",
         preview: false
       });
     }
