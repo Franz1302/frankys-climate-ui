@@ -25,3 +25,6 @@ jobs:
         uses: hacs/action@main
         with:
           category: plugin
+          # The image validator can return an empty README on PR branch refs.
+          # The actual PNG and Markdown image link are included and verified in this repo.
+          ignore: images

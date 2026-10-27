@@ -48,30 +48,31 @@ function make(extra={}){
  schedule.c._openSchedule();assert.equal(events[0].detail.entityId,'schedule.plan');
  const noPlan=make();delete noPlan.states['schedule.plan'];assert.equal(noPlan.c._scheduleEnabled(),false);
  assert(!source.includes('schedule/create')&&!source.includes('schedule/update'),'No schedule writes');
- assert(source.includes('history/history_during_period'),'24-hour Recorder query retained');
+ assert(source.includes('history/history_during_period'),'Recorder query retained; graph displays 12h');
  const render=make({heating_status_entity:'binary_sensor.heating'});
  render.c.shadowRoot={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};
  render.c._temperatureHistory=[];
  render.c._bindSlider=()=>{};
  render.c._render=Card.prototype._render;
+ render.c.clientWidth=1300; // Desktop viewbox in Node's minimal HTMLElement mock.
  render.c._render();
  assert(render.c.shadowRoot.innerHTML.includes('data-slider'));
- assert(render.c.shadowRoot.innerHTML.includes('M28 0 C44 17'),'Flame artwork present');
+ assert(render.c.shadowRoot.innerHTML.includes('data-ring-depth'),'3D ring artwork present');
+ assert(render.c.shadowRoot.innerHTML.includes('-12 h'),'12h Recorder time axis present');
  assert(!render.c.shadowRoot.innerHTML.includes('data-action="manual"'));
  // Heating state is deliberately short; no duplicate room name may overlap the flame.
  render.c._config.name='SCHLAFZIMMER';
  render.c._render();
- assert(render.c.shadowRoot.innerHTML.includes('>OFF</text>'));
- assert(!render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER ·'));
- assert(render.c.shadowRoot.innerHTML.includes('transform="translate(628 163)"'));
- assert(render.c.shadowRoot.innerHTML.includes('y="282"'));
+ assert(render.c.shadowRoot.innerHTML.includes('OFF</text>'),'OFF label must remain visible');
+ assert(render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER'),'Card name is used as an accessible SVG label');
+ assert(!render.c.shadowRoot.innerHTML.includes('SCHLAFZIMMER ·'),'No duplicate old title');
  // Explicit heating sensor takes precedence over hvac_action in this configuration.
  render.states['binary_sensor.heating'].state='on';
  render.c._render();
- assert(render.c.shadowRoot.innerHTML.includes('>HEATING</text>'));
+ assert(render.c.shadowRoot.innerHTML.includes('data-heating'),'Flame should appear when sensor reports heating');
 
  // HUD border must not be clipped by a fixed-radius wrapper when the card is narrow.
- assert(source.includes('overflow:visible;border-radius:0'),'SVG corners should not be CSS-clipped');
+ assert(source.includes('.cell{position:relative;width:100%;height:0;overflow:hidden}'),'Responsive stacked SVG cells present');
  assert(!source.includes('overflow:hidden;border-radius:22px'));
 
  // Language and display units change formatting but never change HA's native value.
@@ -127,5 +128,5 @@ function make(extra={}){
 
  // The visual editor must expose the unit selector in addition to the language selector.
  assert(source.includes('id="temperature_unit"') && source.includes('id="language"'));
- console.log('PASS: Climate UI core, responsive frame, DE/EN and °C/°F conversions');
+ console.log('PASS: Climate UI 3D HUD, controls, 12h chart, DE/EN and °C/°F conversions');
 })().catch(error=>{console.error(error);process.exitCode=1});
