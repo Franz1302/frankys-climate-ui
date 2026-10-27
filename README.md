@@ -1,4 +1,4 @@
-# Franky's Climate UI — v0.2.2
+# Franky's Climate UI — v0.2.3
 
 ![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
