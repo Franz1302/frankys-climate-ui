@@ -1567,6 +1567,9 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         this._schedPortal = portal;
         this._schedDay = "monday";
         this._schedDirty = false;
+        this._schedOriginal = null;
+        this._schedDraft = null;
+        this._schedFocusSet = false;
         this._schedCopy = false;
         this._schedLoading = true;
         this._schedError = "";
@@ -1656,7 +1659,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const hm = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")+":00";
         const data = Object.assign({}, clone && clone.data || {}, {
           temperature: clone && clone.data && Number.isFinite(Number(clone.data.temperature))
-            ? Number(clone.data.temperature) : this._targetTemp()
+            ? Number(clone.data.temperature) : this._convertTemp(this._targetTemp(),this._nativeTempUnit(),this._config.target_entity ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit())
         });
         // Keep existing helper associations in newly created rows.
         if (!data.climate_entity && this._scheduleClimate()) data.climate_entity = this._scheduleClimate();
@@ -1714,11 +1717,11 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const unit = this._displayTempUnit();
         const button = (a,label,cls,extra) => '<button type="button" data-action="'+a+'" class="'+(cls||"")+'" '+(extra||"")+'>'+label+'</button>';
         const tabs = days.map((d,i)=>button("day",t.days[i],d===day?"current":"",'data-day="'+d+'" aria-pressed="'+(d===day)+'"')).join("");
-        const rowHtml = !this._schedLoading && !this._schedError && this._schedDraft ?
+        const rowHtml = !this._schedLoading && this._schedDraft ?
           (this._schedDraft[day] || []).map((block,i) =>
             '<div class="time-row">' +
               '<label>'+t.start+'<input type="time" step="60" data-row="'+i+'" data-field="from" value="'+escape(String(block.from).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
-              '<label>'+t.end+'<input type="time" step="60" data-row="'+i+'" data-field="to" value="'+escape(String(block.to).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
+              '<label>'+t.end+'<input type="text" inputmode="numeric" placeholder="HH:MM" pattern="[0-2][0-9]:[0-5][0-9]" data-row="'+i+'" data-field="to" value="'+escape(String(block.to).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
               '<label>'+t.temp+' ('+unit+')<input type="number" inputmode="decimal" step="0.1" data-row="'+i+'" data-field="temperature" value="'+escape(this._schedDisplay(block.data && block.data.temperature))+'" '+(!admin?'disabled':'')+'></label>'+
               button("remove",t.delete,"remove",'data-row="'+i+'" '+(!admin?'disabled':''))+
             '</div>').join("") : "";
