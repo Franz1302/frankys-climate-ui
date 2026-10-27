@@ -7,6 +7,32 @@
 
 A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
 
+
+## Choose your design (Classic / Hybrid)
+
+There is still **one card** and one HACS installation: `custom:frankys-climate-ui-card`.
+
+The visual editor now offers **Design → Classic / Hybrid**:
+
+- **Classic** is the default for existing dashboards, including YAML configs without a `design` key. The established JARVIS layout, settings, actions, helpers, and 24-hour history remain available.
+- **Hybrid** is an optional photo-realistic 3D glass / neon thermostat with a responsive mobile layout, calculated temperature scales based on the HA entity's min/max limits, and an orange 12-hour Recorder temperature curve with gaps shown.
+- Both appearances share the same Home Assistant control and schedule implementation. No second custom repository, resource, or custom-card type is required.
+
+### Example
+
+```yaml
+type: custom:frankys-climate-ui-card
+design: hybrid
+display_entity: climate.living_room
+control_entity: climate.living_room
+language: auto
+temperature_unit: auto
+```
+
+Change `design: hybrid` to `design: classic` to restore the previous design, or remove the key entirely. Existing configurations without `design` keep the Classic interface.
+
+**Note:** The Hybrid mode uses a high-resolution embedded background image and a real SVG overlay. For slower browsers, the Classic mode remains available. The isolated Hybrid test card is not a separate release.
+
 ## Functions
 
 - Touch temperature ring with orange setpoint pointer and current-temperature marker.
