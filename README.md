@@ -1,43 +1,34 @@
-# Franky's Climate UI — v0.1.2 Preview 🔥
-
-![Franky's Climate UI — Designskizze](https://raw.githubusercontent.com/Franz1302/frankys-climate-ui/main/images/climate-ui-preview.svg)
-
-*Designskizze zur Orientierung. Die tatsächliche Karte übernimmt die Werte aus Home Assistant.*
-
+# Franky's Climate UI — refreshed 3D/Neon interface (draft)
 
 A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
 
 
-## Choose your design (Classic / Hybrid)
+## Updated JARVIS UI
 
-There is still **one card** and one HACS installation: `custom:frankys-climate-ui-card`.
+This is an **update to the existing card**, not a second card or design. The Home Assistant card type remains `custom:frankys-climate-ui-card` and the existing HACS installation and configurations remain valid. The new look replaces the previous interface automatically.
 
-The visual editor now offers **Design → Classic / Hybrid**:
+- Photo-realistic glass/neon thermostat with responsive mobile layout.
+- Temperature dial scale adapts to the entity's configured min/max limits (including sauna, pool and Fahrenheit ranges).
+- Recorder-backed glowing orange **12-hour** actual-temperature history; unavailable states create gaps and the graph restores on refresh.
+- The existing mode actions, entity/helpers, flame options and schedule handling are retained. The visual configuration editor uses the existing fields; **no design selector** is needed.
 
-- **Classic** is the default for existing dashboards, including YAML configs without a `design` key. The established JARVIS layout, settings, actions, helpers, and 24-hour history remain available.
-- **Hybrid** is an optional photo-realistic 3D glass / neon thermostat with a responsive mobile layout, calculated temperature scales based on the HA entity's min/max limits, and an orange 12-hour Recorder temperature curve with gaps shown.
-- Both appearances share the same Home Assistant control and schedule implementation. No second custom repository, resource, or custom-card type is required.
-
-### Example
+### Existing configuration remains valid
 
 ```yaml
 type: custom:frankys-climate-ui-card
-design: hybrid
 display_entity: climate.living_room
 control_entity: climate.living_room
 language: auto
 temperature_unit: auto
 ```
 
-Change `design: hybrid` to `design: classic` to restore the previous design, or remove the key entirely. Existing configurations without `design` keep the Classic interface.
-
-**Note:** The Hybrid mode uses a high-resolution embedded background image and a real SVG overlay. For slower browsers, the Classic mode remains available. The isolated Hybrid test card is not a separate release.
+No migration, new resource, or additional HACS repository is required. A normal update will change the appearance for all existing cards.
 
 ## Functions
 
 - Touch temperature ring with orange setpoint pointer and current-temperature marker.
 - Plus and minus buttons; reads/writes Home Assistant target temperature.
-- 24-hour recorder-backed temperature history, restored after browser reload.
+- 12-hour recorder-backed temperature history, restored after browser reload.
 - Left AUS / AUTO / MANUELL buttons: native climate modes if available, optional helper or explicit HA service/script actions otherwise.
 - Orange heating flame: **on** when measured heating is active, **off** otherwise. No standby state.
 - Optional direct flame toggle only for a deliberately selected, suitable heater actuator. No automatic detection of a mains supply plug; when AUS is selected the flame control is locked.
