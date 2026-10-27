@@ -1723,8 +1723,8 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const rowHtml = !this._schedLoading && this._schedDraft ?
           (this._schedDraft[day] || []).map((block,i) =>
             '<div class="time-row">' +
-              '<label>'+t.start+'<input type="time" step="60" data-row="'+i+'" data-field="from" value="'+escape(String(block.from).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
-              '<label>'+t.end+'<input type="text" inputmode="numeric" placeholder="HH:MM" pattern="[0-2][0-9]:[0-5][0-9]" data-row="'+i+'" data-field="to" value="'+escape(String(block.to).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
+              '<label>'+t.start+'<input type="text" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" data-row="'+i+'" data-field="from" value="'+escape(String(block.from).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
+              '<label>'+t.end+'<input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="[0-2][0-9]:[0-5][0-9]" data-row="'+i+'" data-field="to" value="'+escape(String(block.to).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
               '<label>'+t.temp+' ('+unit+')<input type="number" inputmode="decimal" step="0.1" data-row="'+i+'" data-field="temperature" value="'+escape(this._schedDisplay(block.data && block.data.temperature))+'" '+(!admin?'disabled':'')+'></label>'+
               button("remove",t.delete,"remove",'data-row="'+i+'" '+(!admin?'disabled':''))+
             '</div>').join("") : "";
@@ -1758,7 +1758,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           (!this._schedLoading && this._schedDraft && admin ? button("save",escape(this._schedSaving?t.saving:t.save),"primary",this._schedSaving?'disabled':''):'')+
           '</footer></div>';
         const active = root.querySelector('.tabs .current');
-        if (active && !this._schedFocusSet) { active.focus(); this._schedFocusSet = true; }
+        if (active && !this._schedFocusSet) { active.focus({preventScroll:true}); this._schedFocusSet = true; }
       }
 
       // Without a separate setpoint helper an empty target_entity must not turn into a 0 °C limit.
