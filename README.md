@@ -1,4 +1,4 @@
-# Franky's Climate UI — v0.2.0
+# Franky's Climate UI — v0.2.1
 
 ![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
@@ -9,7 +9,7 @@ A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based
 
 This is an **update to the existing card**, not a second card or design. The Home Assistant card type remains `custom:frankys-climate-ui-card` and the existing HACS installation and configurations remain valid. The new look replaces the previous interface automatically.
 
-- Photo-realistic glass/neon thermostat with responsive mobile layout.
+- Photo-realistic glass/neon thermostat that always remains **one proportional card**: the ring, temperature curve and mode buttons scale together, even in narrow dashboard columns. No vertically stacked panels or layout change.
 - Temperature dial scale adapts to the entity's configured min/max limits (including sauna, pool and Fahrenheit ranges).
 - Recorder-backed glowing orange **12-hour** actual-temperature history; unavailable states create gaps and the graph restores on refresh.
 - The existing mode actions, entity/helpers, flame options and schedule handling are retained. The visual configuration editor uses the existing fields; **no design selector** is needed.

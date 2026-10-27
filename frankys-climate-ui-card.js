@@ -1365,7 +1365,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
   // Dial: scale start at 144° (lower left), end at 396° (lower right), 252° in total, clockwise.
   const CX = 938, CY = 570, DIAL_START = 144, DIAL_SPAN = 252;
   const TICK_R1 = 350, TICK_R2 = 372, LABEL_R = 360;
-  const NARROW_PX = 600;
   const HISTORY_MS = 12 * 3600000;
   const ARC_STOPS = [[0, [0, 176, 255]], [.15, [0, 214, 255]], [.33, [0, 246, 255]], [.4, [217, 255, 154]], [.45, [255, 244, 2]],
     [.5, [254, 251, 36]], [.62, [255, 215, 0]], [.73, [255, 140, 0]], [.79, [255, 62, 0]], [.9, [254, 1, 19]], [1, [255, 26, 58]]];
@@ -1418,28 +1417,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
 
       static getConfigElement() {
         return document.createElement(EDITOR_TAG);
-      }
-
-      connectedCallback() {
-        super.connectedCallback();
-        if (!this._onResize) {
-          this._onResize = () => { if (this._isNarrow() !== this._narrow) this._render(); };
-          window.addEventListener("resize", this._onResize);
-          if (window.ResizeObserver) { this._resizeObserver = new ResizeObserver(this._onResize); this._resizeObserver.observe(this); }
-        }
-        this._onResize();
-      }
-
-      disconnectedCallback() {
-        super.disconnectedCallback();
-        if (this._onResize) window.removeEventListener("resize", this._onResize);
-        if (this._resizeObserver) this._resizeObserver.disconnect();
-        this._onResize = null; this._resizeObserver = null;
-      }
-
-      _isNarrow() {
-        const width = this.clientWidth || this.getBoundingClientRect().width || 0;
-        return width > 0 && width < NARROW_PX;
       }
 
       // Without a separate setpoint helper an empty target_entity must not turn into a 0 °C limit.
@@ -1703,7 +1680,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         </g>`;
       }
 
-      _dialMarkup(narrow) {
+      _dialMarkup() {
         const mode = this._mode(), target = this._targetTemp();
         const status = this._error || (this._pending ? this._t("sending") : "");
         const start = polar(332, DIAL_START), end = polar(332, DIAL_START + DIAL_SPAN);
@@ -1725,7 +1702,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           <rect x="921" y="264" width="44" height="119" rx="22" fill="#55200a" stroke="#ff7900" stroke-width="2"/>
           <rect x="929" y="272" width="26" height="102" rx="13" fill="url(#pointer)" stroke="#ffd63b" stroke-width="2"/>
         </g>
-        <path data-slider d="M${f1(start[0])} ${f1(start[1])} A332 332 0 1 1 ${f1(end[0])} ${f1(end[1])}" fill="none" stroke="transparent" stroke-width="${narrow ? 120 : 62}" style="pointer-events:stroke;touch-action:none;cursor:pointer"/>
+        <path data-slider d="M${f1(start[0])} ${f1(start[1])} A332 332 0 1 1 ${f1(end[0])} ${f1(end[1])}" fill="none" stroke="transparent" stroke-width="62" style="pointer-events:stroke;touch-action:none;cursor:pointer"/>
         <g pointer-events="none"><circle cx="814" cy="768" r="78" fill="url(#keygloss)"/><circle cx="1058" cy="768" r="78" fill="url(#keygloss)"/></g>
         <circle class="hit key" data-action="minus" cx="814" cy="768" r="84" role="button" aria-label="−"/>
         <circle class="hit key" data-action="plus" cx="1058" cy="768" r="84" role="button" aria-label="+"/>
@@ -1735,17 +1712,13 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
 
       _render() {
         if (!this._config || !this.shadowRoot || this._sliderDrag) return;
-        const narrow = this._isNarrow();
-        this._narrow = narrow;
         const href = this._escape(this._config.background_image || MATERIAL);
         const label = this._escape(this._config.name || "Klima");
-        const cell = (vb, content, first) => `<div class="cell" style="padding-bottom:${(vb[3] / vb[2] * 100).toFixed(3)}%"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vb.join(" ")}" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${first ? this._defsMarkup() + `<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>` : '<use href="#hybrid-material" xlink:href="#hybrid-material" pointer-events="none"/>'}${content}</svg></div>`;
-        // Narrow screens: dial and the left panels become two stacked crops of the same material so touch targets stay large.
-        const body = narrow
-          ? cell([500, 125, 880, 810], this._dialMarkup(true), true) + cell([70, 125, 436, 805], this._leftMarkup(), false)
-          : cell([40, 94, 1370, 870], this._leftMarkup() + this._dialMarkup(false), true);
-        // Skip identical output: hass updates arrive constantly and the DOM (with the large material) is costly to rebuild.
-        const signature = [narrow, label, href.length, href.slice(0, 64), body.replace(href, "")].join("|");
+        // Exactly one proportional SVG/card at every width. Let viewBox and 100%-wide CSS scale
+        // dial, temperature/history panel and mode controls together; never stack/crop panels.
+        const body = `<div class="cell" style="padding-bottom:63.504%"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="40 94 1370 870" preserveAspectRatio="xMidYMid meet" role="group" aria-label="${label}">${this._defsMarkup()}<image id="hybrid-material" data-static-material x="0" y="0" width="1448" height="1086" href="${href}" xlink:href="${href}" pointer-events="none"/>${this._leftMarkup()}${this._dialMarkup()}</svg></div>`;
+        // Avoid costly redraws: the existing SVG scales natively on resize without JS rerender.
+        const signature = [label, href.length, href.slice(0, 64), body.replace(href, "")].join("|");
         if (signature === this._renderSignature && this.shadowRoot.firstElementChild) return;
         this._renderSignature = signature;
         this.renderCount = (this.renderCount || 0) + 1;
