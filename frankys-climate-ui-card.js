@@ -1419,6 +1419,359 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         return document.createElement(EDITOR_TAG);
       }
 
+
+      // Schedule editor: native HA schedule/list and schedule/update, never direct storage edits.
+      // The modal lives outside this card's shadow root, so periodic temperature renders
+      // cannot destroy form state while somebody is editing the schedule.
+      _schedLabels() {
+        return this._lang() === "de" ? {
+          title:"Heizplan",days:["Mo","Di","Mi","Do","Fr","Sa","So"],
+          start:"Beginn",end:"Ende",temp:"Temperatur",add:"Zeitfenster hinzufügen",
+          copy:"Tag kopieren",copyTo:"Kopieren nach",apply:"Übernehmen",
+          delete:"Entfernen",cancel:"Abbrechen",save:"Speichern",close:"Schließen",
+          loading:"Heizplan wird geladen …",empty:"Für diesen Tag sind keine Zeitfenster eingetragen.",
+          gap:"24:00 bedeutet Tagesende. Außerhalb der Zeitfenster bleibt die zuletzt eingestellte Solltemperatur erhalten.",
+          help:"Zeitfenster und Temperaturen direkt bearbeiten. Änderungen wirken erst nach dem Speichern im AUTO-Modus.",
+          error:"Heizplan konnte nicht geladen werden.",native:"Im Home Assistant bearbeiten",
+          noAccess:"Dieser Benutzer darf den Heizplan nicht bearbeiten.",
+          updated:"Heizplan wurde in einer anderen Ansicht geändert. Bitte schließen und erneut öffnen.",
+          saved:"Heizplan gespeichert. Die neuen Werte gelten beim nächsten Zeitblock.",
+          discard:"Ungespeicherte Änderungen verwerfen?",
+          invalidTime:"Bitte gültige Uhrzeiten verwenden (00:00 bis 24:00).",
+          invalidRange:"Das Ende muss nach dem Beginn liegen.",
+          overlap:"Zeitfenster dürfen sich nicht überschneiden.",
+          invalidTemp:"Bitte für jedes Zeitfenster eine gültige Temperatur eingeben.",
+          saving:"Speichern …", failed:"Speichern fehlgeschlagen",
+          day:"Wochentag",readOnly:"Nur Ansicht: Zum Speichern sind Administratorrechte nötig.",
+          noSpace:"Dieser Tag ist vollständig belegt. Zum Hinzufügen wird das längste Zeitfenster geteilt.",
+          changed:"Ungespeicherte Änderungen"
+        } : {
+          title:"Heating schedule",days:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+          start:"Start",end:"End",temp:"Temperature",add:"Add time block",
+          copy:"Copy day",copyTo:"Copy to",apply:"Apply",
+          delete:"Remove",cancel:"Cancel",save:"Save",close:"Close",
+          loading:"Loading schedule …",empty:"No time blocks for this day.",
+          gap:"24:00 means end of day. Outside time blocks the last set temperature is retained.",
+          help:"Edit times and temperatures here. Changes apply in AUTO mode after you save.",
+          error:"Could not load schedule.",native:"Edit in Home Assistant",
+          noAccess:"This user cannot edit the schedule.",
+          updated:"Schedule changed elsewhere. Close and reopen before saving.",
+          saved:"Schedule saved. New settings take effect at the next time block.",
+          discard:"Discard unsaved changes?",
+          invalidTime:"Enter valid times (00:00 to 24:00).",
+          invalidRange:"End time must be after start time.",
+          overlap:"Time blocks must not overlap.",
+          invalidTemp:"Enter a valid temperature for every block.",
+          saving:"Saving …",failed:"Save failed",
+          day:"Weekday",readOnly:"Read-only: Administrator access is required to save.",
+          noSpace:"This day is full. Adding a block splits the longest existing block.",
+          changed:"Unsaved changes"
+        };
+      }
+
+      _schedDayKeys() {
+        return ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+      }
+
+      _schedDisplay(raw) {
+        const v = Number(raw);
+        if (!Number.isFinite(v)) return "";
+        const source = this._config.target_entity
+          ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit();
+        const converted = this._convertTemp(v, source, this._displayTempUnit());
+        return Number(converted.toFixed(1)).toString();
+      }
+
+      _schedNative(display) {
+        const raw = String(display).trim().replace(",", ".");
+        if (!raw || !Number.isFinite(Number(raw))) return NaN;
+        const source = this._config.target_entity
+          ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit();
+        return Math.round(this._convertTemp(Number(raw), this._displayTempUnit(), source) * 100) / 100;
+      }
+
+      _schedMinutes(time) {
+        const value = String(time || "");
+        const match = /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/.exec(value);
+        if (!match) return NaN;
+        const h = Number(match[1]), m = Number(match[2]);
+        return m > 59 || h > 24 || (h === 24 && m !== 0) ? NaN : 60 * h + m;
+      }
+
+      _schedValidate(draft) {
+        const t = this._schedLabels();
+        const fromUnit = this._config.target_entity
+          ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit();
+        const min = this._convertTemp(this._minTemp(), this._nativeTempUnit(), fromUnit);
+        const max = this._convertTemp(this._maxTemp(), this._nativeTempUnit(), fromUnit);
+        for (const day of this._schedDayKeys()) {
+          let previousEnd = -1;
+          const rows = (draft[day] || []).slice().sort((a,b) => this._schedMinutes(a.from) - this._schedMinutes(b.from));
+          for (const block of rows) {
+            const begin = this._schedMinutes(block.from), end = this._schedMinutes(block.to);
+            if (!Number.isFinite(begin) || !Number.isFinite(end) || begin === 1440) return t.invalidTime;
+            if (end <= begin) return t.invalidRange;
+            if (begin < previousEnd) return t.overlap;
+            previousEnd = end;
+            const value = block.data && block.data.temperature;
+            if (value === "" || value === null || value === undefined ||
+                !Number.isFinite(Number(value)) || Number(value) < min - .001 || Number(value) > max + .001) return t.invalidTemp;
+          }
+        }
+        return "";
+      }
+
+      _schedPayload(draft, original) {
+        const payload = { name: original.name };
+        if (original.icon) payload.icon = original.icon;
+        for (const day of this._schedDayKeys()) {
+          payload[day] = (draft[day] || []).map(block => ({
+            from: String(block.from).length === 5 ? block.from + ":00" : block.from,
+            to: String(block.to).length === 5 ? block.to + ":00" : block.to,
+            data: Object.assign({}, block.data || {})
+          })).sort((a,b) => this._schedMinutes(a.from) - this._schedMinutes(b.from));
+        }
+        return payload;
+      }
+
+      _schedClose(force) {
+        if (!this._schedPortal) return;
+        const t = this._schedLabels();
+        if (!force && this._schedDirty && !window.confirm(t.discard)) return;
+        if (this._schedKeydown) document.removeEventListener("keydown", this._schedKeydown);
+        this._schedPortal.remove();
+        this._schedPortal = null;
+        this._schedDirty = false;
+        this._schedKeydown = null;
+        if (this.isConnected && this._schedOriginFocus && typeof this._schedOriginFocus.focus === "function") this._schedOriginFocus.focus({preventScroll:true});
+        this._schedOriginFocus = null;
+      }
+
+      disconnectedCallback() {
+        this._schedClose(true);
+        super.disconnectedCallback();
+      }
+
+      _schedNativeDialog() {
+        const schedule = this._scheduleState();
+        if (!schedule) return;
+        this._schedClose(true);
+        this.dispatchEvent(new CustomEvent("hass-more-info", {
+          bubbles:true,composed:true,detail:{entityId:schedule.entity_id}
+        }));
+      }
+
+      async _openSchedule() {
+        const entity = this._scheduleState();
+        if (!entity || this._schedPortal) return;
+        const portal = document.createElement("div");
+        portal.attachShadow({mode:"open"});
+        this._schedPortal = portal;
+        this._schedOriginFocus = this.shadowRoot && this.shadowRoot.querySelector('[data-action="schedule"]');
+        this._schedDay = "monday";
+        this._schedDirty = false;
+        this._schedOriginal = null;
+        this._schedDraft = null;
+        this._schedFocusSet = false;
+        this._schedCopy = false;
+        this._schedLoading = true;
+        this._schedError = "";
+        this._schedSaved = false;
+        document.body.appendChild(portal);
+        const root = portal.shadowRoot;
+        root.addEventListener("click", ev => {
+          if (ev.target === root.querySelector(".shade")) return this._schedClose(false);
+          const el = ev.target.closest("[data-action]");
+          if (!el) return;
+          const action = el.dataset.action;
+          if (action === "close") return this._schedClose(false);
+          if (action === "native") return this._schedNativeDialog();
+          if (action === "day") { this._schedDay = el.dataset.day; this._schedCopy = false; return this._schedRender(); }
+          if (action === "add") return this._schedAdd();
+          if (action === "remove") {
+            const i = Number(el.dataset.row);
+            this._schedDraft[this._schedDay].splice(i,1);
+            this._schedDirty = true; this._schedSaved = false; return this._schedRender();
+          }
+          if (action === "copy") { this._schedCopy = !this._schedCopy; return this._schedRender(); }
+          if (action === "apply") return this._schedCopyDay();
+          if (action === "save") return void this._schedSave();
+        });
+        root.addEventListener("change", ev => {
+          const el = ev.target;
+          if (!el || !el.dataset || el.dataset.field === undefined) return;
+          const i = Number(el.dataset.row), row = this._schedDraft[this._schedDay] && this._schedDraft[this._schedDay][i];
+          if (!row) return;
+          if (el.dataset.field === "temperature") row.data.temperature = this._schedNative(el.value);
+          else if (el.dataset.field === "from") row.from = el.value;
+          else if (el.dataset.field === "to") row.to = el.value;
+          this._schedDirty = true; this._schedSaved = false; this._schedError = "";
+          const state = root.querySelector("[data-status]");
+          if (state) state.textContent = this._schedLabels().changed;
+        });
+        this._schedKeydown = ev => {
+          if (!this._schedPortal) return;
+          if (ev.key === "Escape") {
+            ev.preventDefault(); this._schedClose(false);
+          }
+          if (ev.key === "Tab") {
+            const controls = Array.from(root.querySelectorAll('button:not([disabled]),input:not([disabled])'));
+            const first = controls[0], last = controls[controls.length-1];
+            if (!first || !last) return;
+            if (ev.shiftKey && root.activeElement === first) { ev.preventDefault(); last.focus({preventScroll:true}); }
+            else if (!ev.shiftKey && root.activeElement === last) { ev.preventDefault(); first.focus({preventScroll:true}); }
+          }
+        };
+        document.addEventListener("keydown", this._schedKeydown);
+        this._schedRender();
+        try {
+          if (!this._hass || typeof this._hass.callWS !== "function") throw Error("Schedule API unavailable");
+          const schedules = await this._hass.callWS({type:"schedule/list"});
+          if (this._schedPortal !== portal) return;
+          const id = entity.entity_id.slice("schedule.".length);
+          const found = Array.isArray(schedules) && schedules.find(item => item.id === id);
+          if (!found) throw Error("Schedule not found or not editable");
+          this._schedOriginal = JSON.parse(JSON.stringify(found));
+          this._schedDraft = {};
+          for (const day of this._schedDayKeys()) this._schedDraft[day] = JSON.parse(JSON.stringify(found[day] || []));
+          this._schedLoading = false;
+          this._schedRender();
+        } catch (err) {
+          if (this._schedPortal !== portal) return;
+          this._schedLoading = false;
+          this._schedError = String(err && err.message || err);
+          this._schedRender();
+        }
+      }
+
+      _schedAdd() {
+        const rows = this._schedDraft[this._schedDay];
+        const sorted = rows.slice().sort((a,b) => this._schedMinutes(a.from) - this._schedMinutes(b.from));
+        let start = 480, end = 540, cursor = 0, foundGap = false, clone = sorted[0];
+        for (const row of sorted) {
+          const from = this._schedMinutes(row.from), to = this._schedMinutes(row.to);
+          if (from - cursor >= 30) {
+            start = cursor; end = from; foundGap = true; break;
+          }
+          cursor = Math.max(cursor, to);
+        }
+        if (!foundGap && 1440 - cursor >= 30) {
+          start = cursor; end = 1440; foundGap = true;
+        }
+        if (!foundGap && sorted.length) {
+          // No free space: split the longest existing interval instead of overlapping.
+          const longest = sorted.slice().sort((a,b) =>
+            (this._schedMinutes(b.to)-this._schedMinutes(b.from)) -
+            (this._schedMinutes(a.to)-this._schedMinutes(a.from)))[0];
+          const a = this._schedMinutes(longest.from), b = this._schedMinutes(longest.to);
+          if (b - a < 2) return;
+          start = Math.floor((a+b)/2);
+          end = b;
+          longest.to = String(Math.floor(start/60)).padStart(2,"0")+":"+String(start%60).padStart(2,"0")+":00";
+          clone = longest;
+        }
+        const hm = m => String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0")+":00";
+        const data = Object.assign({}, clone && clone.data || {}, {
+          temperature: clone && clone.data && Number.isFinite(Number(clone.data.temperature))
+            ? Number(clone.data.temperature) : this._convertTemp(this._targetTemp(),this._nativeTempUnit(),this._config.target_entity ? this._sourceTempUnit(this._config.target_entity) : this._nativeTempUnit())
+        });
+        // Keep existing helper associations in newly created rows.
+        if (!data.climate_entity && this._scheduleClimate()) data.climate_entity = this._scheduleClimate();
+        if (!data.target_entity && this._config.target_entity) data.target_entity = this._config.target_entity;
+        if (!data.mode_entity && this._config.mode_entity) data.mode_entity = this._config.mode_entity;
+        rows.push({from:hm(start),to:hm(end),data});
+        this._schedDirty = true; this._schedSaved = false; this._schedRender();
+      }
+
+      _schedCopyDay() {
+        const root = this._schedPortal && this._schedPortal.shadowRoot;
+        if (!root) return;
+        const targets = Array.from(root.querySelectorAll("[data-copy-day]:checked")).map(x => x.dataset.copyDay);
+        if (!targets.length) return;
+        for (const day of targets) this._schedDraft[day] = JSON.parse(JSON.stringify(this._schedDraft[this._schedDay]));
+        this._schedCopy = false;
+        this._schedDirty = true; this._schedSaved = false;
+        this._schedRender();
+      }
+
+      async _schedSave() {
+        if (!this._schedOriginal || this._schedSaving || this._hass.user && this._hass.user.is_admin === false) return;
+        const t = this._schedLabels(), err = this._schedValidate(this._schedDraft);
+        if (err) { this._schedError = err; return this._schedRender(); }
+        this._schedSaving = true; this._schedError = ""; this._schedRender();
+        const portal = this._schedPortal;
+        try {
+          const remote = await this._hass.callWS({type:"schedule/list"});
+          if (this._schedPortal !== portal) return;
+          const current = Array.isArray(remote) && remote.find(v => v.id === this._schedOriginal.id);
+          if (!current || JSON.stringify(current) !== JSON.stringify(this._schedOriginal))
+            throw Error(t.updated);
+          const payload = this._schedPayload(this._schedDraft,this._schedOriginal);
+          const answer = await this._hass.callWS(Object.assign({
+            type:"schedule/update",schedule_id:this._schedOriginal.id
+          },payload));
+          if (this._schedPortal !== portal) return;
+          this._schedOriginal = JSON.parse(JSON.stringify(answer && answer.id ? answer : Object.assign({id:this._schedOriginal.id},payload)));
+          this._schedDraft = {};
+          for (const day of this._schedDayKeys()) this._schedDraft[day] = JSON.parse(JSON.stringify(this._schedOriginal[day] || []));
+          this._schedDirty = false; this._schedSaved = true;
+        } catch (err) {
+          this._schedError = String(err && err.message || err);
+        } finally {
+          this._schedSaving = false;
+          if (this._schedPortal === portal) this._schedRender();
+        }
+      }
+
+      _schedRender() {
+        const portal = this._schedPortal; if (!portal) return;
+        const t = this._schedLabels(), root = portal.shadowRoot, day = this._schedDay;
+        const escape = text => this._escape(String(text));
+        const days = this._schedDayKeys(), admin = !(this._hass.user && this._hass.user.is_admin === false);
+        const unit = this._displayTempUnit();
+        const button = (a,label,cls,extra) => '<button type="button" data-action="'+a+'" class="'+(cls||"")+'" '+(extra||"")+'>'+label+'</button>';
+        const tabs = days.map((d,i)=>button("day",t.days[i],d===day?"current":"",'data-day="'+d+'" aria-pressed="'+(d===day)+'"')).join("");
+        const rowHtml = !this._schedLoading && this._schedDraft ?
+          (this._schedDraft[day] || []).map((block,i) =>
+            '<div class="time-row">' +
+              '<label>'+t.start+'<input type="text" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="HH:MM" data-row="'+i+'" data-field="from" value="'+escape(String(block.from).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
+              '<label>'+t.end+'<input type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="[0-2][0-9]:[0-5][0-9]" data-row="'+i+'" data-field="to" value="'+escape(String(block.to).slice(0,5))+'" '+(!admin?'disabled':'')+'></label>'+
+              '<label>'+t.temp+' ('+unit+')<input type="number" inputmode="decimal" step="0.1" data-row="'+i+'" data-field="temperature" value="'+escape(this._schedDisplay(block.data && block.data.temperature))+'" '+(!admin?'disabled':'')+'></label>'+
+              button("remove",t.delete,"remove",'data-row="'+i+'" '+(!admin?'disabled':''))+
+            '</div>').join("") : "";
+        const noRows = this._schedDraft && !(this._schedDraft[day] || []).length;
+        const copyPanel = this._schedCopy ? '<section class="copy-panel"><div class="legend">'+t.copyTo+'</div><div class="copy-days">'+days.filter(d=>d!==day).map(d=>'<label><input type="checkbox" data-copy-day="'+d+'"> '+t.days[days.indexOf(d)]+'</label>').join("")+'</div>'+button("apply",t.apply,"primary")+'</section>' : "";
+        const text = this._schedLoading ? t.loading : this._schedError && !this._schedDraft ? t.error + ' ' + escape(this._schedError) : '';
+        root.innerHTML = '<style>'+
+          ':host{position:fixed;inset:0;z-index:9999;display:block;font-family:var(--paper-font-body1_-_font-family,Arial,sans-serif);color:var(--primary-text-color,#fff)}'+
+          '*{box-sizing:border-box}.shade{position:fixed;inset:0;background:#0009}.modal{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;max-width:760px;width:calc(100% - 20px);max-height:92vh;display:flex;flex-direction:column;background:var(--card-background-color,#142337);border:1px solid var(--divider-color,#425366);border-radius:16px;box-shadow:0 16px 65px #0008;overflow:hidden}'+
+          'header{padding:18px 22px 12px;border-bottom:1px solid var(--divider-color,#445);display:flex;gap:14px;align-items:flex-start;justify-content:space-between}h2{font-size:21px;margin:0 0 5px;font-weight:600}header p{margin:0;font-size:13px;color:var(--secondary-text-color,#adbdcc)}'+
+          'button{cursor:pointer;border:1px solid var(--divider-color,#6b7680);border-radius:9px;background:transparent;color:inherit;font:inherit;padding:10px 14px;min-height:42px}button:focus-visible,input:focus-visible{outline:2px solid var(--primary-color,#03a9f4);outline-offset:1px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:var(--primary-color,#03a9f4);border-color:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}.remove{align-self:end;color:var(--error-color,#f77)}'+
+          '.content{padding:16px 22px 10px;overflow-y:auto;overscroll-behavior:contain}.tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:16px}.tabs button{padding:6px;min-width:0;font-size:13px}.tabs .current{background:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}'+
+          '.time-row{display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--divider-color,#334)}label{display:flex;flex-direction:column;font-size:12px;gap:5px;color:var(--secondary-text-color,#b9c6d1)}input{width:100%;min-width:0;font:inherit;font-size:16px;padding:10px;background:var(--secondary-background-color,#102638);border:1px solid var(--divider-color,#667787);border-radius:7px;color:var(--primary-text-color,#fff)}'+
+          '.tools{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.note{color:var(--secondary-text-color,#b9c6d1);font-size:12px;line-height:1.5;margin:10px 0}.msg{font-size:13px;margin:10px 0}.error{color:var(--error-color,#fa8888)}.success{color:var(--success-color,#72d99b)}'+
+          '.copy-panel{border:1px solid var(--divider-color,#566);border-radius:8px;padding:14px;margin:12px 0}.legend{font-weight:bold;margin-bottom:10px}.copy-days{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px}.copy-days label{display:flex;flex-direction:row;align-items:center;font-size:14px}.copy-days input{width:auto}'+
+          'footer{border-top:1px solid var(--divider-color,#445);padding:14px 22px;display:flex;gap:10px;align-items:center;justify-content:flex-end}.status{flex:1;font-size:12px;color:var(--secondary-text-color,#bbc)}'+
+          '@media(max-width:560px){.modal{max-height:96vh}.content,header,footer{padding-left:12px;padding-right:12px}.time-row{grid-template-columns:1fr 1fr}.time-row .remove{justify-self:end}.tabs button{font-size:12px;padding:4px}.status{font-size:11px}}'+
+        '</style><div class="shade"></div><div class="modal" role="dialog" aria-modal="true" aria-label="'+escape(t.title)+'">'+
+          '<header><div><h2>'+escape(t.title)+' · '+escape((this._schedOriginal && this._schedOriginal.name) || (this._scheduleState() || {}).attributes && (this._scheduleState() || {}).attributes.friendly_name || "")+'</h2><p>'+escape(t.help)+'</p></div>'+button("close","×","close",'aria-label="'+escape(t.close)+'"')+'</header>'+
+          '<div class="content">'+(this._schedLoading?'<p role="status">'+escape(text)+'</p>':
+           (!this._schedDraft?'<p class="msg error" role="alert">'+escape(text)+'</p>'+button("native",escape(t.native)) :
+            '<div class="tabs" role="group" aria-label="'+escape(t.day)+'">'+tabs+'</div>'+
+            (noRows ? '<p>'+escape(t.empty)+'</p>' : rowHtml)+
+            '<div class="tools">'+button("add",escape(t.add),"",' '+(!admin?'disabled':''))+button("copy",escape(t.copy),"",' '+(!admin?'disabled':''))+'</div>'+
+            copyPanel+'<p class="note">'+escape(t.gap)+'</p>'+
+            (!admin?'<p class="msg error">'+escape(t.readOnly)+'</p>':'')+
+            (this._schedError?'<p class="msg error" role="alert">'+escape(this._schedError)+'</p>':'')+
+            (this._schedSaved?'<p class="msg success" role="status">'+escape(t.saved)+'</p>':'')
+           ))+'</div>'+
+          '<footer><div class="status" data-status>'+(this._schedDirty?escape(t.changed):'')+'</div>'+button("close",escape(t.cancel))+
+          (!this._schedLoading && this._schedDraft && admin ? button("save",escape(this._schedSaving?t.saving:t.save),"primary",this._schedSaving?'disabled':''):'')+
+          '</footer></div>';
+        const active = root.querySelector('.tabs .current');
+        if (active && !this._schedFocusSet) { active.focus({preventScroll:true}); this._schedFocusSet = true; }
+      }
+
       // Without a separate setpoint helper an empty target_entity must not turn into a 0 °C limit.
       _minTemp() {
         if (this._config.target_entity) return super._minTemp();

@@ -1,4 +1,4 @@
-# Franky's Climate UI — v0.2.3
+# Franky's Climate UI — v0.2.4
 
 ![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
@@ -34,7 +34,7 @@ No migration, new resource, or additional HACS repository is required. A normal 
 - Left AUS / AUTO / MANUELL buttons: native climate modes if available, optional helper or explicit HA service/script actions otherwise.
 - Orange heating flame: **on** when measured heating is active, **off** otherwise. No standby state.
 - Optional direct flame toggle only for a deliberately selected, suitable heater actuator. No automatic detection of a mains supply plug; when AUS is selected the flame control is locked.
-- Clock opens an **existing Home Assistant Schedule helper's native detail/editor dialog**. It appears only when a schedule is configured or linked to the climate entity.
+- Clock opens a **straightforward weekly heating schedule editor**: select Monday–Sunday, edit start/end times and temperatures in directly labeled fields, add/remove blocks, or copy a day's plan to other days. Save and Cancel are explicit. It appears only when an existing schedule helper is linked; all helper `data` fields remain intact. If the editor cannot load the schedule, the original HA helper dialog remains available as a fallback.
 - Visual card editor with **language** selection: Auto (Home Assistant), Deutsch, English. Number formatting follows the selected language (21,5 / 21.5).
 - **Temperature units**: Auto (Home Assistant), Celsius (°C) or Fahrenheit (°F). Readings, setpoint, ring tick labels and schedule info use the chosen unit, while service calls retain their actual source entity units.
 - Proportional SVG scaling without clipping the HUD's rounded corners when resized.
@@ -82,15 +82,19 @@ These entity IDs are **examples**, not automatically installed entities.
 | AUS | Native `off`; otherwise `mode_entity` or custom action |
 | Heating flame | `heating_status_entity` binary on/off, else native `hvac_action: heating` |
 | Tap flame | Optional `flame_switch_entity` (`switch` or `input_boolean`) on/off; blocked when AUS |
-| Clock | Native HA schedule entity's more-info UI (display/open only) |
+| Clock | Home Assistant's built-in `schedule/list` (read) and `schedule/update` (save) WebSocket endpoints for an already configured Schedule helper; never edits `.storage` directly |
 
-**A climate entity exposing only `heat` and `off` does not have a real automatic time program.** The AUTO button will not fake one. To use a custom schedule, configure an existing HA helper and automation. This card never creates a helper, builds an automation, writes a schedule or overrides thermostat safety limits.
+**A climate entity exposing only `heat` and `off` does not have a real automatic time program.** The AUTO button will not fake one. To use a custom schedule, configure an existing HA helper and automation. This card never creates a helper, builds an automation or overrides thermostat safety limits. Schedule edits are applied **only after explicitly pressing Save**; no heating control actions are issued by this UI. A separate Home Assistant automation must read the schedule to drive the actual target temperature.
 
 You may assign `mode_off_action`, `mode_auto_action` or `mode_manual_action` to a script entity ID (`script.example`) or a single Home Assistant service action in JSON. Such actions override the default mode button commands; the displayed selected mode must still be reported by the device or `mode_entity`.
 
 ### Installation
 
 Add `https://github.com/Franz1302/frankys-climate-ui` to **HACS → Custom repositories** as category **Dashboard/Lovelace**, then install **Franky's Climate UI**. Add a new dashboard card with type `custom:frankys-climate-ui-card`. This repository is independent of Frankys_Stuff Climate Card; you can keep both cards installed.
+
+### Heating schedule editing
+
+Configure an existing `schedule` helper under **Settings → Devices & services → Helpers** and select it in the card's **AUTO-Heizplan** field. Open the clock icon on the card. Each row is a time block with start, end (`24:00` means midnight), and temperature. You can select days, add/remove blocks, or copy one day to other days. The editor validates overlaps, ranges and temperatures before writing via the official Home Assistant API, checks for concurrent changes, and preserves custom data such as `block`, `climate_entity`, `target_entity`, and `mode_entity`. No YAML or "Additional data" field is needed. If some time ranges are empty, the existing thermostat setpoint remains unchanged in those gaps; make a 24-hour schedule for continuous control. Saving requires a user with schedule-update permissions.
 
 ### Testing
 
