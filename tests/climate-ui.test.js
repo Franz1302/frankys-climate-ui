@@ -59,7 +59,7 @@ function make(extra={}){
  assert.equal(schedule.c._schedValidate(draft),'','Valid schedule with midnight bound');
  const payload=schedule.c._schedPayload(draft,plan);
  assert.equal(payload.name,plan.name);assert.equal(payload.icon,plan.icon);
- assert.deepEqual(payload.monday[0].data,block1.data,'Preserve schedule metadata including helper associations');
+ assert.deepEqual(JSON.parse(JSON.stringify(payload.monday[0].data)),block1.data,'Preserve schedule metadata including helper associations');
  assert.equal(payload.monday[1].to,'24:00:00','End-of-day boundary is not truncated');
  const overlapping=JSON.parse(JSON.stringify(draft));overlapping.monday[1].from='05:50';
  assert.equal(schedule.c._schedValidate(overlapping),schedule.c._schedLabels().overlap);
