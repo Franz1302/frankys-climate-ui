@@ -1430,7 +1430,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           copy:"Tag kopieren",copyTo:"Kopieren nach",apply:"Übernehmen",
           delete:"Entfernen",cancel:"Abbrechen",save:"Speichern",close:"Schließen",
           loading:"Heizplan wird geladen …",empty:"Für diesen Tag sind keine Zeitfenster eingetragen.",
-          gap:"Hinweis: Außerhalb der Zeitfenster bleibt die zuletzt eingestellte Solltemperatur erhalten.",
+          gap:"24:00 bedeutet Tagesende. Außerhalb der Zeitfenster bleibt die zuletzt eingestellte Solltemperatur erhalten.",
           help:"Zeitfenster und Temperaturen direkt bearbeiten. Änderungen wirken erst nach dem Speichern im AUTO-Modus.",
           error:"Heizplan konnte nicht geladen werden.",native:"Im Home Assistant bearbeiten",
           noAccess:"Dieser Benutzer darf den Heizplan nicht bearbeiten.",
@@ -1451,7 +1451,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           copy:"Copy day",copyTo:"Copy to",apply:"Apply",
           delete:"Remove",cancel:"Cancel",save:"Save",close:"Close",
           loading:"Loading schedule …",empty:"No time blocks for this day.",
-          gap:"Note: Outside scheduled time blocks the last set temperature is retained.",
+          gap:"24:00 means end of day. Outside time blocks the last set temperature is retained.",
           help:"Edit times and temperatures here. Changes apply in AUTO mode after you save.",
           error:"Could not load schedule.",native:"Edit in Home Assistant",
           noAccess:"This user cannot edit the schedule.",
@@ -1543,6 +1543,8 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         this._schedPortal = null;
         this._schedDirty = false;
         this._schedKeydown = null;
+        if (this.isConnected && this._schedOriginFocus && typeof this._schedOriginFocus.focus === "function") this._schedOriginFocus.focus({preventScroll:true});
+        this._schedOriginFocus = null;
       }
 
       disconnectedCallback() {
@@ -1565,6 +1567,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const portal = document.createElement("div");
         portal.attachShadow({mode:"open"});
         this._schedPortal = portal;
+        this._schedOriginFocus = this.shadowRoot && this.shadowRoot.querySelector('[data-action="schedule"]');
         this._schedDay = "monday";
         this._schedDirty = false;
         this._schedOriginal = null;
@@ -1602,13 +1605,21 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           if (el.dataset.field === "temperature") row.data.temperature = this._schedNative(el.value);
           else if (el.dataset.field === "from") row.from = el.value;
           else if (el.dataset.field === "to") row.to = el.value;
-          this._schedDirty = true; this._schedSaved = false;
+          this._schedDirty = true; this._schedSaved = false; this._schedError = "";
           const state = root.querySelector("[data-status]");
           if (state) state.textContent = this._schedLabels().changed;
         });
         this._schedKeydown = ev => {
-          if (ev.key === "Escape" && this._schedPortal) {
+          if (!this._schedPortal) return;
+          if (ev.key === "Escape") {
             ev.preventDefault(); this._schedClose(false);
+          }
+          if (ev.key === "Tab") {
+            const controls = Array.from(root.querySelectorAll('button:not([disabled]),input:not([disabled])'));
+            const first = controls[0], last = controls[controls.length-1];
+            if (!first || !last) return;
+            if (ev.shiftKey && root.activeElement === first) { ev.preventDefault(); last.focus({preventScroll:true}); }
+            else if (!ev.shiftKey && root.activeElement === last) { ev.preventDefault(); first.focus({preventScroll:true}); }
           }
         };
         document.addEventListener("keydown", this._schedKeydown);
@@ -1737,7 +1748,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
           'header{padding:18px 22px 12px;border-bottom:1px solid var(--divider-color,#445);display:flex;gap:14px;align-items:flex-start;justify-content:space-between}h2{font-size:21px;margin:0 0 5px;font-weight:600}header p{margin:0;font-size:13px;color:var(--secondary-text-color,#adbdcc)}'+
           'button{cursor:pointer;border:1px solid var(--divider-color,#6b7680);border-radius:9px;background:transparent;color:inherit;font:inherit;padding:10px 14px;min-height:42px}button:focus-visible,input:focus-visible{outline:2px solid var(--primary-color,#03a9f4);outline-offset:1px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:var(--primary-color,#03a9f4);border-color:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}.remove{align-self:end;color:var(--error-color,#f77)}'+
           '.content{padding:16px 22px 10px;overflow-y:auto;overscroll-behavior:contain}.tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:16px}.tabs button{padding:6px;min-width:0;font-size:13px}.tabs .current{background:var(--primary-color,#03a9f4);color:var(--text-primary-color,#fff)}'+
-          '.time-row{display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--divider-color,#334)}label{display:flex;flex-direction:column;font-size:12px;gap:5px;color:var(--secondary-text-color,#b9c6d1)}input{width:100%;min-width:0;font:inherit;font-size:16px;padding:10px;background:var(--secondary-background-color,#102638);border:1px solid var(--divider-color,#667787);border-radius:7px;color:var(--primary-text-color,#fff);color-scheme:dark}'+
+          '.time-row{display:grid;grid-template-columns:1fr 1fr 1.2fr auto;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--divider-color,#334)}label{display:flex;flex-direction:column;font-size:12px;gap:5px;color:var(--secondary-text-color,#b9c6d1)}input{width:100%;min-width:0;font:inherit;font-size:16px;padding:10px;background:var(--secondary-background-color,#102638);border:1px solid var(--divider-color,#667787);border-radius:7px;color:var(--primary-text-color,#fff)}'+
           '.tools{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.note{color:var(--secondary-text-color,#b9c6d1);font-size:12px;line-height:1.5;margin:10px 0}.msg{font-size:13px;margin:10px 0}.error{color:var(--error-color,#fa8888)}.success{color:var(--success-color,#72d99b)}'+
           '.copy-panel{border:1px solid var(--divider-color,#566);border-radius:8px;padding:14px;margin:12px 0}.legend{font-weight:bold;margin-bottom:10px}.copy-days{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px}.copy-days label{display:flex;flex-direction:row;align-items:center;font-size:14px}.copy-days input{width:auto}'+
           'footer{border-top:1px solid var(--divider-color,#445);padding:14px 22px;display:flex;gap:10px;align-items:center;justify-content:flex-end}.status{flex:1;font-size:12px;color:var(--secondary-text-color,#bbc)}'+
