@@ -77,6 +77,44 @@ function make(extra={}){
  assert.equal(schedule.c._schedDraft.monday.length,3,'Adding to an already full day splits a block');
  assert.equal(schedule.c._schedValidate({monday:schedule.c._schedDraft.monday}),'','Split must not overlap');
  assert(schedule.c._schedDraft.monday.every(r=>r.data.temperature!==undefined),'New block has its own temperature');
+ const live=make();
+ const originalPlan=Object.assign({id:plan.id,name:plan.name,icon:plan.icon},JSON.parse(JSON.stringify(draft)));
+ live.c._schedOriginal=JSON.parse(JSON.stringify(originalPlan));
+ live.c._schedDraft=JSON.parse(JSON.stringify(draft));
+ live.c._schedPortal={};live.c._schedRender=()=>{};live.c._hass.user={is_admin:true};
+ const wsCalls=[];
+ live.c._hass.callWS=async msg=>{
+   wsCalls.push(JSON.parse(JSON.stringify(msg)));
+   if(msg.type==='schedule/list')return [JSON.parse(JSON.stringify(originalPlan))];
+   if(msg.type==='schedule/update')return Object.assign({id:msg.schedule_id},msg);
+   throw Error('Unexpected WebSocket message');
+ };
+ await live.c._schedSave();
+ assert.equal(wsCalls.length,2,'Save first rereads live schedule to avoid stale overwrites');
+ assert.equal(wsCalls[1].type,'schedule/update');
+ assert.equal(wsCalls[1].schedule_id,originalPlan.id);
+ assert.equal(wsCalls[1].monday[0].data.custom,'keep');
+ assert.equal(live.c._schedSaved,true,'Success should be visible in the editor');
+ const conflict=make();
+ conflict.c._schedOriginal=originalPlan;
+ conflict.c._schedDraft=JSON.parse(JSON.stringify(draft));
+ conflict.c._schedPortal={};conflict.c._schedRender=()=>{};
+ const writes=[];
+ conflict.c._hass.callWS=async msg=>{
+   writes.push(msg.type);
+   if(msg.type==='schedule/list')return [Object.assign({},originalPlan,{name:'Changed externally'})];
+   throw Error('Unexpected write');
+ };
+ await conflict.c._schedSave();
+ assert.deepEqual(writes,['schedule/list'],'Conflicting changes must never be overwritten');
+ assert(conflict.c._schedError.includes('changed')||conflict.c._schedError.includes('geändert'));
+ const readOnly=make();
+ readOnly.c._schedOriginal=originalPlan;
+ readOnly.c._schedDraft=JSON.parse(JSON.stringify(draft));
+ readOnly.c._schedPortal={};readOnly.c._schedRender=()=>{};
+ readOnly.c._hass.user={is_admin:false};
+ let callCount=0;readOnly.c._hass.callWS=async()=>{callCount++;};
+ await readOnly.c._schedSave();assert.equal(callCount,0,'Read-only users cannot send update');
 
  assert(source.includes('history/history_during_period'),'Recorder query retained; graph displays 12h');
  const render=make({heating_status_entity:'binary_sensor.heating'});
