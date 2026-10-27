@@ -1,4 +1,6 @@
-# Franky's Climate UI — refreshed 3D/Neon interface (draft)
+# Franky's Climate UI — v0.2.0
+
+![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
 A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
 
