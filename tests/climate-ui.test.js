@@ -26,9 +26,32 @@ function make(extra={}){
  await basic.c._setTarget(23);
  assert.equal(basic.calls[1][0],'climate');
  assert.equal(basic.calls[1][1],'set_temperature');
+ // Regression: simple heat/off climate thermostats regulate their own setpoint in heat.
  const noAuto=make();noAuto.states['climate.one'].attributes.hvac_modes=['off','heat'];
- await noAuto.c._setMode('AUTO');assert.equal(noAuto.calls.length,0);
+ assert.equal(noAuto.c._mode(),'AUTO','heat/off thermostat displays AUTO, never MANUELL');
+ assert.equal(noAuto.c._nativeModeSupported('AUTO'),true);
+ assert.equal(noAuto.c._nativeModeSupported('MANUELL'),false,'No direct manual actuator configured');
+ await noAuto.c._setMode('AUTO');assert.equal(noAuto.calls.length,1);
+ assert.equal(noAuto.calls[0][0],'climate');
+ assert.equal(noAuto.calls[0][1],'set_hvac_mode');
+ assert.equal(noAuto.calls[0][2].hvac_mode,'heat','AUTO maps to supported native heat');
+ await noAuto.c._setMode('MANUELL');assert.equal(noAuto.calls.length,1,'Disabled MANUELL must never actuate thermostat');
  assert.equal(noAuto.c._error,'MODE NOT SUPPORTED');
+ noAuto.states['climate.one'].state='off';
+ assert.equal(noAuto.c._mode(),'AUS');
+ await noAuto.c._setMode('AUS');
+ assert.equal(noAuto.calls[1][1],'turn_off');
+ // Unsupported auto must still fail on a climate that has no heat or auto at all.
+ const unsupported=make();unsupported.states['climate.one'].attributes.hvac_modes=['off'];
+ await unsupported.c._setMode('AUTO');assert.equal(unsupported.calls.length,0);
+ assert.equal(unsupported.c._error,'MODE NOT SUPPORTED');
+ // Existing three-mode devices keep native heat=MANUELL and auto=AUTO.
+ assert.equal(basic.c._nativeModeSupported('MANUELL'),true);
+ // Explicit mode actions must still override the native mode interpretation.
+ const special=make({mode_auto_action:'script.my_auto'});
+ special.states['climate.one'].attributes.hvac_modes=['off','heat'];
+ assert.equal(special.c._heatIsAuto(),false);
+ await special.c._setMode('AUTO');assert.equal(special.calls[0][0],'script');
  const custom=make({mode_entity:'input_select.mode',target_entity:'input_number.temp',heating_status_entity:'binary_sensor.heating',flame_switch_entity:'switch.actor',schedule_entity:'schedule.plan'});
  assert.equal(custom.c._mode(),'MANUELL');
  assert.equal(custom.c._targetTemp(),21);
@@ -117,6 +140,12 @@ function make(extra={}){
  await readOnly.c._schedSave();assert.equal(callCount,0,'Read-only users cannot send update');
 
  assert(source.includes('history/history_during_period'),'Recorder query retained; graph displays 12h');
+ // Both the default card and 3D HUD respect the same mode capability checks.
+ noAuto.c._temperatureHistory=[];
+ noAuto.c._curveMarkup=()=>'';
+ const simpleHud=noAuto.c._leftMarkup();
+ assert(simpleHud.includes('data-action="mode" data-mode="AUTO"'),'AUTO is clickable in the 3D HUD');
+ assert(!simpleHud.includes('data-action="mode" data-mode="MANUELL"'),'MANUELL is disabled in the 3D HUD');
  const render=make({heating_status_entity:'binary_sensor.heating'});
  render.c.shadowRoot={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[]};
  render.c._temperatureHistory=[];
