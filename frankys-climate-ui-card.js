@@ -412,6 +412,26 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const e=this._controlState();
     return !!e && e.state!=="off" && (e.attributes||{}).hvac_action==="heating";
   }
+  // A simple thermostat with heat/off regulates its own temperature while in heat.
+  // Preserve that native AUTO behaviour without changing helpers or explicit actions.
+  _heatIsAuto() {
+    if (this._config.mode_entity || this._hasModeAction("AUTO") || this._hasModeAction("MANUELL")) return false;
+    const e = this._controlState();
+    const modes = e && e.attributes && e.attributes.hvac_modes;
+    return this._profile() === "thermostat" && Array.isArray(modes) &&
+      modes.includes("heat") && !modes.includes("auto");
+  }
+  _nativeModeSupported(mode) {
+    if (this._config.mode_entity || this._hasModeAction(mode)) return true;
+    const e = this._controlState();
+    const modes = e && e.attributes && e.attributes.hvac_modes;
+    if (!Array.isArray(modes)) return false;
+    if (this._heatIsAuto()) {
+      if (mode === "AUTO") return true;
+      if (mode === "MANUELL") return false;
+    }
+    return modes.includes({ AUS: "off", AUTO: "auto", MANUELL: "heat" }[mode]);
+  }
   _mode() {
     if (this._config.mode_entity) {
       const e=this._state(this._config.mode_entity);
@@ -423,6 +443,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     }
     const e=this._controlState();
     if(!e)return "UNAVAILABLE";
+    if (e.state === "heat" && this._heatIsAuto()) return "AUTO";
     return ({heat:"MANUELL",auto:"AUTO",off:"AUS"})[e.state]||"UNAVAILABLE";
   }
   _minTemp() {
@@ -522,8 +543,9 @@ class JarvisClimateCardLegacy extends HTMLElement {
       if(e.state!==option)await this._call(domain,"select_option",{entity_id:id,option});return;
     }
     const id=this._config.control_entity||this._config.display_entity;
-    const e=this._state(id),m={AUS:"off",AUTO:"auto",MANUELL:"heat"}[mode];
-    if(!e||!m||!Array.isArray((e.attributes||{}).hvac_modes)||!e.attributes.hvac_modes.includes(m)){
+    const e=this._state(id),heatIsAuto=this._heatIsAuto();
+    const m=mode==="AUTO"&&heatIsAuto?"heat":{AUS:"off",AUTO:"auto",MANUELL:"heat"}[mode];
+    if((mode==="MANUELL"&&heatIsAuto)||!e||!m||!Array.isArray((e.attributes||{}).hvac_modes)||!e.attributes.hvac_modes.includes(m)){
       this._error="MODE NOT SUPPORTED";this._render();return;
     }
     if(m==="off")await this._call("climate","turn_off",{entity_id:id});
@@ -835,9 +857,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const heaterUnavailable = false;
     const g = this._dialGeometry(target, actual);
     const name = this._config.name || "Klima";
-    const modes=((this._controlState()||{}).attributes||{}).hvac_modes||[];
-    const canMode=m=>!!this._config.mode_entity||this._hasModeAction(m)||
-      (Array.isArray(modes)&&modes.includes({AUS:"off",AUTO:"auto",MANUELL:"heat"}[m]));
+    const canMode=m=>this._nativeModeSupported(m);
     const modeStroke = m => mode === m ? (m === "AUS" ? "#ff7a22" : "#18dfff") : "#507184";
     const modeText = m => mode === m ? (m === "AUS" ? "#ff9c46" : "#34e9ff") : "#9eb1bd";
     const status=this._error|| (this._pending?this._t("sending"):
@@ -1993,7 +2013,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
 
       _leftMarkup() {
         const mode = this._mode(), actual = this._actualTemp();
-        const canMode = m => !!this._config.mode_entity || this._hasModeAction(m) || (((this._controlState() || {}).attributes || {}).hvac_modes || []).includes({ AUS: "off", AUTO: "auto", MANUELL: "heat" }[m]);
+        const canMode = m => this._nativeModeSupported(m);
         const de = this._lang() === "de";
         return `${this._curveMarkup()}<text data-title="actual" x="208" y="273" font-size="26" fill="#aacbdc">${de ? "Ist-Temperatur" : "Current Temp."}</text>
         <text data-title="mode" x="225" y="545" font-size="34" fill="#d3efff">${de ? "Modus" : "Mode"}</text>
