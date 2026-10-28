@@ -171,7 +171,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
   _toNativeTemp(value, sourceUnit) { return this._convertTemp(value, sourceUnit, this._nativeTempUnit()); }
   _toDisplayTemp(value) { return this._convertTemp(value, this._nativeTempUnit(), this._displayTempUnit()); }
-  _profile() { return "thermostat"; }
+  _profile() { return (this._config && this._config.profile) || "thermostat"; }
   _lang() {
     let raw = String((this._config && this._config.language) || "auto").toLowerCase();
     if (raw === "auto") raw = String((this._hass && this._hass.locale && this._hass.locale.language) || (this._hass && this._hass.language) || "en").toLowerCase();
@@ -422,8 +422,14 @@ class JarvisClimateCardLegacy extends HTMLElement {
       return "UNAVAILABLE";
     }
     const e=this._controlState();
-    if(!e)return "UNAVAILABLE";
-    return ({heat:"MANUELL",auto:"AUTO",off:"AUS"})[e.state]||"UNAVAILABLE";
+    if(!e || ["unknown","unavailable"].includes(e.state))return "UNAVAILABLE";
+    if(this._profile()==="thermostat"){
+      const heater=this._config.heater_entity && this._state(this._config.heater_entity);
+      if(this._manualArmed || (e.state==="off" && heater && heater.state==="on"))return "MANUELL";
+    }
+    // Native "heat" on a thermostat is automatic setpoint regulation,
+    // not a direct manual heater override.
+    return e.state==="off" ? "AUS" : "AUTO";
   }
   _minTemp() {
     const ds = this._displayState(); const attr = ds && ds.attributes ? ds.attributes.min_temp : undefined;
@@ -503,6 +509,38 @@ class JarvisClimateCardLegacy extends HTMLElement {
     return value !== undefined && value !== null && value !== "";
   }
 
+  _canMode(mode) {
+    if(this._hasModeAction(mode))return true;
+    const profile=this._profile();
+    if(profile==="advanced" && mode==="AUS" && this._config.off_script)return true;
+    if(this._config.mode_entity){
+      const e=this._state(this._config.mode_entity);
+      const options=e&&e.attributes&&e.attributes.options;
+      const aliases={AUS:["AUS","OFF"],AUTO:["AUTO"],MANUELL:["MANUELL","MANUAL"]}[mode]||[];
+      return Array.isArray(options)&&options.some(o=>aliases.includes(String(o).toUpperCase()));
+    }
+    const id=this._config.control_entity||this._config.display_entity;
+    const e=this._state(id),modes=e&&e.attributes&&e.attributes.hvac_modes;
+    if(profile==="thermostat"){
+      if(mode==="MANUELL"){
+        const heater=this._config.heater_entity,actor=this._state(heater);
+        return !!heater && heater.startsWith("switch.") && !!actor && ["on","off"].includes(actor.state);
+      }
+      if(mode==="AUTO")return !!e && !!this._thermostatAutoMode(id);
+      return mode==="AUS" && !!e && (!Array.isArray(modes)||modes.includes("off"));
+    }
+    if(mode==="MANUELL")return false;
+    if(mode==="AUS")return !!e&&(!Array.isArray(modes)||modes.includes("off"));
+    if(mode==="AUTO")return !!e&&(!Array.isArray(modes)||modes.includes("heat")||modes.includes("auto"));
+    return false;
+  }
+  _canToggleFlame() {
+    if(this._config.flame_switch_entity)return this._mode()!=="AUS";
+    if(this._profile()==="thermostat")
+      return this._mode()==="MANUELL" && this._canMode("MANUELL");
+    if(this._profile()==="advanced")return !!this._config.manual_script;
+    return this._profile()==="pool_heatpump" && !!(this._config.control_entity||this._config.display_entity);
+  }
   async _setMode(mode) {
     if(this._pending||!this._hass)return;
     if(this._hasModeAction(mode)){
@@ -510,6 +548,10 @@ class JarvisClimateCardLegacy extends HTMLElement {
       try{action=frankysModeAction(this._modeAction(mode));}
       catch(e){this._error="INVALID MODE ACTION";this._render();return;}
       await this._call(action.domain,action.service,action.data,action.target);return;
+    }
+    const profile=this._profile();
+    if(profile==="advanced" && mode==="AUS" && this._config.off_script){
+      await this._call("script","turn_on",{entity_id:this._config.off_script});return;
     }
     if(this._config.mode_entity){
       const id=this._config.mode_entity,domain=id.split(".")[0],e=this._state(id);
@@ -519,22 +561,74 @@ class JarvisClimateCardLegacy extends HTMLElement {
       if(!["input_select","select"].includes(domain)||!option||["unknown","unavailable"].includes(e.state)){
         this._error="MODE UNAVAILABLE";this._render();return;
       }
-      if(e.state!==option)await this._call(domain,"select_option",{entity_id:id,option});return;
+      if(e.state!==option)await this._call(domain,"select_option",{entity_id:id,option});
+      return;
     }
     const id=this._config.control_entity||this._config.display_entity;
-    const e=this._state(id),m={AUS:"off",AUTO:"auto",MANUELL:"heat"}[mode];
-    if(!e||!m||!Array.isArray((e.attributes||{}).hvac_modes)||!e.attributes.hvac_modes.includes(m)){
-      this._error="MODE NOT SUPPORTED";this._render();return;
+    const e=this._state(id);
+    if(!e||!["AUS","AUTO","MANUELL"].includes(mode))return;
+    if(profile==="thermostat"){
+      if(mode==="MANUELL"){
+        if(!this._canMode(mode))return;
+        this._manualArmed=true;
+        if(e.state!=="off")await this._call("climate","turn_off",{entity_id:id});
+        return;
+      }
+      if(mode==="AUTO"){
+        const hvacMode=this._thermostatAutoMode(id);
+        if(!hvacMode){this._error="MODE NOT SUPPORTED";this._render();return;}
+        this._manualArmed=false;
+        await this._call("climate","set_hvac_mode",{entity_id:id,hvac_mode:hvacMode});
+        return;
+      }
+      this._manualArmed=false;
+      await this._call("climate","turn_off",{entity_id:id});
+      const heater=this._config.heater_entity,actor=this._state(heater);
+      if(heater&&heater.startsWith("switch.")&&actor&&actor.state==="on")
+        await this._call("switch","turn_off",{entity_id:heater});
+      return;
     }
-    if(m==="off")await this._call("climate","turn_off",{entity_id:id});
-    else await this._call("climate","set_hvac_mode",{entity_id:id,hvac_mode:m});
+    if(mode==="MANUELL")return;
+    if(profile==="pool_heatpump" && this._config.manual_entity){
+      const helper=this._config.manual_entity;
+      if(helper.startsWith("input_boolean."))
+        await this._call("input_boolean","turn_on",{entity_id:helper});
+    }
+    if(mode==="AUS")await this._call("climate","turn_off",{entity_id:id});
+    else{
+      const hvacMode=this._thermostatAutoMode(id);
+      if(!hvacMode){this._error="MODE NOT SUPPORTED";this._render();return;}
+      await this._call("climate","set_hvac_mode",{entity_id:id,hvac_mode:hvacMode});
+    }
   }
   async _toggleFlame() {
-    const id=this._config.flame_switch_entity;
-    if(!id||this._mode()==="AUS"||this._pending)return;
-    const domain=id.split(".")[0],e=this._state(id);
-    if(!["switch","input_boolean"].includes(domain)||!e||!["on","off"].includes(e.state))return;
-    await this._call(domain,e.state==="on"?"turn_off":"turn_on",{entity_id:id});
+    if(this._pending||!this._hass)return;
+    if(this._config.flame_switch_entity){
+      if(this._mode()==="AUS")return;
+      const id=this._config.flame_switch_entity,domain=id.split(".")[0],e=this._state(id);
+      if(!["switch","input_boolean"].includes(domain)||!e||!["on","off"].includes(e.state))return;
+      await this._call(domain,e.state==="on"?"turn_off":"turn_on",{entity_id:id});
+      return;
+    }
+    const profile=this._profile();
+    if(profile==="advanced" && this._config.manual_script){
+      await this._call("script","turn_on",{entity_id:this._config.manual_script});return;
+    }
+    if(profile==="pool_heatpump"){
+      const id=this._config.control_entity||this._config.display_entity,e=this._state(id);
+      if(!e)return;
+      const helper=this._config.manual_entity;
+      if(helper && helper.startsWith("input_boolean."))
+        await this._call("input_boolean","turn_on",{entity_id:helper});
+      if(e.state==="off"){
+        const hvacMode=this._thermostatAutoMode(id);
+        if(hvacMode)await this._call("climate","set_hvac_mode",{entity_id:id,hvac_mode:hvacMode});
+      }else await this._call("climate","turn_off",{entity_id:id});
+      return;
+    }
+    if(profile!=="thermostat" || this._mode()!=="MANUELL" || !this._canMode("MANUELL"))return;
+    const id=this._config.heater_entity,e=this._state(id);
+    await this._call("switch",e.state==="on"?"turn_off":"turn_on",{entity_id:id});
   }
   async _changeTarget(delta) {
     const current = this._targetTemp();
@@ -835,9 +929,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const heaterUnavailable = false;
     const g = this._dialGeometry(target, actual);
     const name = this._config.name || "Klima";
-    const modes=((this._controlState()||{}).attributes||{}).hvac_modes||[];
-    const canMode=m=>!!this._config.mode_entity||this._hasModeAction(m)||
-      (Array.isArray(modes)&&modes.includes({AUS:"off",AUTO:"auto",MANUELL:"heat"}[m]));
+    const canMode=m=>this._canMode(m);
     const modeStroke = m => mode === m ? (m === "AUS" ? "#ff7a22" : "#18dfff") : "#507184";
     const modeText = m => mode === m ? (m === "AUS" ? "#ff9c46" : "#34e9ff") : "#9eb1bd";
     const status=this._error|| (this._pending?this._t("sending"):
@@ -916,7 +1008,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
             <path d="M28 0 C44 17 48 29 40 42 C59 31 60 22 57 10 C83 36 78 64 57 76 C32 88 7 73 10 48 C13 31 23 21 28 0Z"/>
             <path fill="${heaterOn?"#ffdb74":"#7b858c"}" d="M40 32 C46 46 31 52 35 62 C38 67 46 67 50 60 C55 77 26 82 22 62 C19 49 29 39 40 32Z"/>
           </g>
-          ${this._config.flame_switch_entity&&mode!=="AUS"?'<rect class="hit" data-action="flame" x="598" y="158" width="120" height="90"/>':""}
+          ${this._canToggleFlame()?'<rect class="hit" data-action="flame" x="598" y="158" width="120" height="90"/>':""}
           <text x="655" y="282" fill="#e2f0f7" font-family="Arial" font-size="23" font-weight="600" text-anchor="middle">${safeStatus}</text>
           <text x="655" y="320" fill="#e7f3f9" font-family="Arial" font-size="27" font-weight="500" text-anchor="middle">${this._t("target")}</text>
           <text data-slider-value x="655" y="398" fill="#ffb13b" font-family="Arial" font-size="88" font-weight="700" text-anchor="middle">${this._fmtTemp(target)}</text>
@@ -2045,7 +2137,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         <path d="M ${polar(262, 205).join(" ")} A262 262 0 0 1 ${polar(262, 285).join(" ")}" fill="none" stroke="url(#chrome)" stroke-width="5" stroke-linecap="round" opacity=".5" pointer-events="none" data-chrome/>
         ${this._ringDepthMarkup()}
         ${this._heaterOn() ? this._flameMarkup() : ""}
-        ${this._config.flame_switch_entity && mode !== "AUS" ? '<rect class="hit" data-action="flame" x="887" y="421" width="104" height="104"/>' : ""}
+        ${this._canToggleFlame() ? '<rect class="hit" data-action="flame" x="887" y="421" width="104" height="104"/>' : ""}
         <text x="940" y="560" text-anchor="middle" font-size="31" fill="#eaf5fc">${this._t("target")}</text>
         <text data-slider-value x="918" y="665" text-anchor="middle" font-size="112" font-weight="700" letter-spacing="-4" fill="url(#hot)" filter="url(#halo)">${this._fmtTemp(target)}</text>
         <text x="1038" y="620" font-size="42" fill="#ffb63b">${this._displayTempUnit()}</text>
