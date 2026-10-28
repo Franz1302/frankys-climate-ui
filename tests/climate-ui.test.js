@@ -20,38 +20,23 @@ function make(extra={}){
  return {c,calls,states};
 }
 (async()=>{
- const basic=make();assert.equal(basic.c._mode(),'MANUELL');
+ const basic=make();assert.equal(basic.c._mode(),'AUTO','native heat is thermostat regulation');
+ assert.equal(basic.c._canMode('MANUELL'),false,'heat alone must never enable manual override');
  await basic.c._setMode('AUTO');
- assert.equal(basic.calls[0][2].hvac_mode,'auto');
+ assert.equal(basic.calls[0][2].hvac_mode,'heat','legacy thermostat AUTO prefers heat');
  await basic.c._setTarget(23);
  assert.equal(basic.calls[1][0],'climate');
  assert.equal(basic.calls[1][1],'set_temperature');
- // Regression: simple heat/off climate thermostats regulate their own setpoint in heat.
  const noAuto=make();noAuto.states['climate.one'].attributes.hvac_modes=['off','heat'];
- assert.equal(noAuto.c._mode(),'AUTO','heat/off thermostat displays AUTO, never MANUELL');
- assert.equal(noAuto.c._nativeModeSupported('AUTO'),true);
- assert.equal(noAuto.c._nativeModeSupported('MANUELL'),false,'No direct manual actuator configured');
- await noAuto.c._setMode('AUTO');assert.equal(noAuto.calls.length,1);
- assert.equal(noAuto.calls[0][0],'climate');
- assert.equal(noAuto.calls[0][1],'set_hvac_mode');
- assert.equal(noAuto.calls[0][2].hvac_mode,'heat','AUTO maps to supported native heat');
- await noAuto.c._setMode('MANUELL');assert.equal(noAuto.calls.length,1,'Disabled MANUELL must never actuate thermostat');
- assert.equal(noAuto.c._error,'MODE NOT SUPPORTED');
- noAuto.states['climate.one'].state='off';
- assert.equal(noAuto.c._mode(),'AUS');
- await noAuto.c._setMode('AUS');
- assert.equal(noAuto.calls[1][1],'turn_off');
- // Unsupported auto must still fail on a climate that has no heat or auto at all.
- const unsupported=make();unsupported.states['climate.one'].attributes.hvac_modes=['off'];
- await unsupported.c._setMode('AUTO');assert.equal(unsupported.calls.length,0);
- assert.equal(unsupported.c._error,'MODE NOT SUPPORTED');
- // Existing three-mode devices keep native heat=MANUELL and auto=AUTO.
- assert.equal(basic.c._nativeModeSupported('MANUELL'),true);
- // Explicit mode actions must still override the native mode interpretation.
- const special=make({mode_auto_action:'script.my_auto'});
- special.states['climate.one'].attributes.hvac_modes=['off','heat'];
- assert.equal(special.c._heatIsAuto(),false);
- await special.c._setMode('AUTO');assert.equal(special.calls[0][0],'script');
+ assert.equal(noAuto.c._mode(),'AUTO');
+ assert.equal(noAuto.c._canMode('AUTO'),true);
+ assert.equal(noAuto.c._canMode('MANUELL'),false);
+ await noAuto.c._setMode('AUTO');assert.equal(noAuto.calls.length,1,'heat/off thermometers can use AUTO');
+ assert.equal(noAuto.calls[0][2].hvac_mode,'heat');
+ const noHeat=make();noHeat.states['climate.one'].attributes.hvac_modes=['off','cool'];
+ assert.equal(noHeat.c._canMode('AUTO'),false);
+ await noHeat.c._setMode('AUTO');assert.equal(noHeat.calls.length,0);
+ assert.equal(noHeat.c._error,'MODE NOT SUPPORTED');
  const custom=make({mode_entity:'input_select.mode',target_entity:'input_number.temp',heating_status_entity:'binary_sensor.heating',flame_switch_entity:'switch.actor',schedule_entity:'schedule.plan'});
  assert.equal(custom.c._mode(),'MANUELL');
  assert.equal(custom.c._targetTemp(),21);
@@ -65,12 +50,51 @@ function make(extra={}){
  assert.equal(custom.calls[2][1],'turn_on');
  custom.states['input_select.mode'].state='AUS';
  await custom.c._toggleFlame();assert.equal(custom.calls.length,3,'AUS must block flame control');
+ // Regression coverage for published v0.2.4: design migration must preserve old controls.
+ const explicitAuto=make({auto_hvac_mode:'auto'});
+ await explicitAuto.c._setMode('AUTO');
+ assert.equal(explicitAuto.calls[0][2].hvac_mode,'auto','explicit auto override wins');
+ const manual=make({profile:'thermostat',heater_entity:'switch.actor'});
+ assert.equal(manual.c._canMode('MANUELL'),true);
+ await manual.c._setMode('MANUELL');
+ assert.equal(manual.calls[0][1],'turn_off','manual override stops thermostat');
+ assert.equal(manual.c._mode(),'MANUELL');
+ assert.equal(manual.c._canToggleFlame(),true);
+ manual.states['climate.one'].state='off'; // HA state after the preceding turn_off.
+ await manual.c._toggleFlame();
+ assert.deepEqual(JSON.parse(JSON.stringify(manual.calls[1])),['switch','turn_on',{entity_id:'switch.actor'}]);
+ manual.states['climate.one'].state='off';manual.states['switch.actor'].state='on';
+ manual.c._manualArmed=false;
+ assert.equal(manual.c._mode(),'MANUELL','override survives state refresh while heater is on');
+ await manual.c._setMode('AUS');
+ assert.equal(manual.calls[2][1],'turn_off');
+ assert.deepEqual(JSON.parse(JSON.stringify(manual.calls[3])),['switch','turn_off',{entity_id:'switch.actor'}]);
+ const plain=make({profile:'thermostat'});
+ await plain.c._setMode('MANUELL');
+ assert.equal(plain.calls.length,0,'never fabricate manual control without an actor');
+ assert.equal(plain.c._canToggleFlame(),false);
+ const adv=make({profile:'advanced',off_script:'script.off'});
+ assert.equal(adv.c._profile(),'advanced');
+ await adv.c._setMode('AUS');
+ assert.deepEqual(JSON.parse(JSON.stringify(adv.calls[0])),['script','turn_on',{entity_id:'script.off'}]);
+ const pool=make({profile:'pool_heatpump',manual_entity:'input_boolean.manual'});
+ assert.equal(pool.c._profile(),'pool_heatpump');
+ await pool.c._setMode('AUTO');
+ assert.deepEqual(JSON.parse(JSON.stringify(pool.calls[0])),['input_boolean','turn_on',{entity_id:'input_boolean.manual'}]);
+ assert.equal(pool.calls[1][2].hvac_mode,'heat');
+ const autoAction=make({mode_auto_action:'script.custom_auto'});
+ await autoAction.c._setMode('AUTO');
+ assert.deepEqual(JSON.parse(JSON.stringify(autoAction.calls[0])),['script','turn_on',{entity_id:'script.custom_auto'}]);
+ const unconfigured=make({mode_entity:'input_select.mode'});
+ unconfigured.states['input_select.mode'].attributes.options=['AUS','MANUELL'];
+ assert.equal(unconfigured.c._canMode('AUTO'),false,'unavailable helper option must be disabled');
+
  const schedule=make({schedule_entity:'schedule.plan'});
  assert(schedule.c._scheduleEnabled());
  assert.equal(schedule.c._scheduleState().entity_id,'schedule.plan');
- const noPlan=make();delete noPlan.states['schedule.plan'];assert.equal(noPlan.c._scheduleEnabled(),false);
+ const noPlan=make();delete noPlan.states['schedule.plan'];assert.equal(noPlan.c._scheduleEnabled(),true);
  assert(source.includes('type:"schedule/list"') && source.includes('type:"schedule/update"'),'Editor uses supported HA schedule WebSocket commands');
- assert(!source.includes('type:"schedule/create"'),'Editor must not silently create schedules');
+ assert(source.includes('type:"schedule/create"'),'Explicit save can create a schedule as in v0.2.8');
  const days=schedule.c._schedDayKeys();
  const plan={id:'schlafzimmer_heizplan',name:'Schlafzimmer Heizplan',icon:'mdi:radiator'};
  const block1={from:'00:00:00',to:'06:00:00',data:{temperature:18,block:'NACHT',climate_entity:'climate.one',target_entity:'input_number.temp',mode_entity:'input_select.mode',custom:'keep'}};
@@ -138,6 +162,49 @@ function make(extra={}){
  readOnly.c._hass.user={is_admin:false};
  let callCount=0;readOnly.c._hass.callWS=async()=>{callCount++;};
  await readOnly.c._schedSave();assert.equal(callCount,0,'Read-only users cannot send update');
+
+ // Exercise the changed schedule load/create paths inside the existing test harness.
+ const oldDocument={...ctx.document};
+ Object.assign(ctx.document,{
+   createElement:()=>({attachShadow(){this.shadowRoot={addEventListener(){}};}}),
+   body:{appendChild(){}},addEventListener(){}
+ });
+ const renamed=make({schedule_entity:'schedule.plan'});
+ renamed.c._schedRender=()=>{};
+ const loadCalls=[];
+ renamed.c._hass.callWS=async msg=>{
+   loadCalls.push(msg.type);
+   if(msg.type==='schedule/list')return [originalPlan];
+   if(msg.type==='config/entity_registry/list')return [{entity_id:'schedule.plan',platform:'schedule',unique_id:originalPlan.id}];
+   throw Error('Loading must never write');
+ };
+ await renamed.c._openSchedule();
+ assert.equal(renamed.c._schedOriginal.id,originalPlan.id,'Renamed schedule resolves through registry unique_id');
+ assert.deepEqual(loadCalls,['schedule/list','config/entity_registry/list']);
+ const fresh=make();delete fresh.states['schedule.plan'];
+ fresh.c._schedRender=()=>{};
+ const createCalls=[];
+ fresh.c._hass.callWS=async msg=>{
+   createCalls.push(JSON.parse(JSON.stringify(msg)));
+   if(msg.type==='schedule/list'||msg.type==='config/entity_registry/list')return [];
+   if(msg.type==='schedule/create')return Object.assign({id:'created_plan'},msg);
+   throw Error('Unexpected schedule operation');
+ };
+ await fresh.c._openSchedule();
+ assert.equal(createCalls.length,2,'Opening an empty editor performs reads only');
+ fresh.c._schedAdd();
+ await fresh.c._schedSave();
+ assert.deepEqual(createCalls.map(x=>x.type),['schedule/list','config/entity_registry/list','schedule/list','schedule/create']);
+ assert.equal(createCalls[3].monday[0].data.climate_entity,'climate.one');
+ assert.equal(fresh.c._schedOriginal.id,'created_plan');
+ assert.equal(fresh.c._schedSaved,true);
+ const duplicate=make();delete duplicate.states['schedule.plan'];
+ duplicate.c._schedRender=()=>{};
+ duplicate.c._hass.callWS=async msg=>msg.type==='schedule/list'?[originalPlan,{...originalPlan,id:'other_plan'}]:[];
+ await duplicate.c._openSchedule();
+ assert.equal(duplicate.c._schedDraft,null,'Ambiguous linked schedules must never be edited');
+ assert(duplicate.c._schedError.includes('Multiple schedules'));
+ Object.assign(ctx.document,oldDocument);
 
  assert(source.includes('history/history_during_period'),'Recorder query retained; graph displays 12h');
  // Both the default card and 3D HUD respect the same mode capability checks.
