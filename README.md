@@ -77,14 +77,14 @@ These entity IDs are **examples**, not automatically installed entities.
 | Surface | Home Assistant backend |
 | --- | --- |
 | Ring, +/- | `climate.set_temperature`, or `input_number.set_value` / `number.set_value` if `target_entity` configured |
-| MANUELL | Native `heat`; otherwise `mode_entity` or custom action |
-| AUTO | Native `auto`; otherwise `mode_entity` or custom action |
+| MANUELL | Native `heat` on devices with a separate `auto` mode; otherwise `mode_entity` or custom action. Disabled on simple `heat/off` thermostats without a manual actuator/action |
+| AUTO | Native `auto`; native `heat` on simple `heat/off` regulating thermostats; otherwise `mode_entity` or custom action |
 | AUS | Native `off`; otherwise `mode_entity` or custom action |
 | Heating flame | `heating_status_entity` binary on/off, else native `hvac_action: heating` |
 | Tap flame | Optional `flame_switch_entity` (`switch` or `input_boolean`) on/off; blocked when AUS |
 | Clock | Home Assistant's built-in `schedule/list` (read) and `schedule/update` (save) WebSocket endpoints for an already configured Schedule helper; never edits `.storage` directly |
 
-**A climate entity exposing only `heat` and `off` does not have a real automatic time program.** The AUTO button will not fake one. To use a custom schedule, configure an existing HA helper and automation. This card never creates a helper, builds an automation or overrides thermostat safety limits. Schedule edits are applied **only after explicitly pressing Save**; no heating control actions are issued by this UI. A separate Home Assistant automation must read the schedule to drive the actual target temperature.
+**A climate entity exposing only `heat` and `off` can still regulate its temperature automatically while in `heat`.** The AUTO button therefore selects `heat` on simple thermostats; it does **not** start or implement a timed heating program. MANUELL remains disabled unless an explicit separate mode action/helper is provided. To use a custom schedule, configure an existing HA helper and automation. This card never creates a helper, builds an automation or overrides thermostat safety limits. Schedule edits are applied **only after explicitly pressing Save**; no heating control actions are issued by this UI. A separate Home Assistant automation must read the schedule to drive the actual target temperature.
 
 You may assign `mode_off_action`, `mode_auto_action` or `mode_manual_action` to a script entity ID (`script.example`) or a single Home Assistant service action in JSON. Such actions override the default mode button commands; the displayed selected mode must still be reported by the device or `mode_entity`.
 
