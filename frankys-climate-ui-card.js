@@ -142,7 +142,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 3, rows: 6, min_rows: 2 }; }
   _state(id) { return id && this._hass && this._hass.states ? this._hass.states[id] : undefined; }
-  _num(v, fallback = NaN) { const n = Number(v); return Number.isFinite(n) ? n : fallback; }
+  _num(v, fallback = NaN) { if (v === null || v === undefined || (typeof v === "string" && !v.trim())) return fallback; const n = Number(v); return Number.isFinite(n) ? n : fallback; }
   _unit(value) {
     const text = String(value || "").trim().toLowerCase();
     if (["°c", "c", "celsius"].includes(text)) return "°C";
@@ -416,7 +416,38 @@ class JarvisClimateCardLegacy extends HTMLElement {
     const e=this._controlState();
     return !!e && e.state!=="off" && (e.attributes||{}).hvac_action==="heating";
   }
+  _autoSource() { return this._config.auto_source || "legacy"; }
+  _autoSourceLabel() {
+    const de=this._lang()==="de";
+    return ({device_schedule:de?"GERÄTEZEITPLAN":"DEVICE SCHEDULE",ha_schedule:de?"HA-HEIZPLAN":"HA SCHEDULE",thermostat:de?"THERMOSTATREGELUNG":"THERMOSTAT"})[this._autoSource()] || "";
+  }
+  _scheduleReady() {
+    const plan=this._state(this._config.schedule_entity), gate=this._state(this._config.schedule_enable_entity);
+    const runner=this._state(this._config.schedule_automation_entity);
+    return !this._config.target_entity && !!plan && /^schedule\./.test(this._config.schedule_entity || "") && ["on","off"].includes(plan.state) &&
+      (!plan.attributes || (!plan.attributes.climate_entity || plan.attributes.climate_entity===this._scheduleClimate())) &&
+      (!plan.attributes || (!plan.attributes.target_entity && !plan.attributes.mode_entity)) &&
+      !!gate && /^input_boolean\./.test(this._config.schedule_enable_entity || "") && ["on","off"].includes(gate.state) &&
+      !!runner && /^automation\./.test(this._config.schedule_automation_entity || "") && runner.state==="on";
+  }
+  async _disableSchedule() {
+    const id=this._config.schedule_enable_entity;
+    if (!id) return true;
+    const gate=this._state(id);
+    if (!/^input_boolean\./.test(id) || !gate || !["on","off"].includes(gate.state)) return false;
+    return gate.state!=="on" || await this._call("input_boolean","turn_off",{entity_id:id});
+  }
   _mode() {
+    if (this._autoSource()==="ha_schedule") {
+      if (!this._scheduleReady() || !this._controlState() || ["unknown","unavailable"].includes(this._controlState().state)) return "UNAVAILABLE";
+      if (this._state(this._config.schedule_enable_entity).state==="on") return "AUTO";
+      const climate=this._controlState();
+      return !climate || climate.state==="off" ? "AUS" : "MANUELL";
+    }
+    if (this._autoSource()==="device_schedule") {
+      const climate=this._controlState();
+      return climate ? ({auto:"AUTO",heat:"MANUELL",off:"AUS"}[climate.state] || "UNAVAILABLE") : "UNAVAILABLE";
+    }
     if (this._config.mode_entity) {
       const e=this._state(this._config.mode_entity);
       const m=String((e&&e.state)||"").toUpperCase();
@@ -514,6 +545,15 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
 
   _canMode(mode) {
+    if (this._autoSource()!=="legacy" && mode==="AUTO") {
+      const climate=this._controlState(), modes=climate && climate.attributes && climate.attributes.hvac_modes;
+      return ["device_schedule","ha_schedule","thermostat"].includes(this._autoSource()) && !this._config.mode_entity && !this._hasModeAction("AUTO") && Array.isArray(modes) &&
+        modes.includes(this._autoSource()==="device_schedule"?"auto":"heat") &&
+        (this._autoSource()!=="ha_schedule" || this._scheduleReady());
+    }
+    if (["device_schedule","ha_schedule"].includes(this._autoSource()) && mode==="MANUELL") {
+      const climate=this._controlState();return !!climate && ((climate.attributes || {}).hvac_modes || []).includes("heat");
+    }
     if(this._hasModeAction(mode))return true;
     const profile=this._profile();
     if(profile==="advanced" && mode==="AUS" && this._config.off_script)return true;
@@ -545,6 +585,23 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
   async _setMode(mode) {
     if(this._pending||!this._hass)return;
+    if (mode==="AUTO" && this._autoSource()!=="legacy") {
+      if (!this._canMode("AUTO")) { this._error=this._lang()==="de"?"AUTO-EINRICHTUNG UNVOLLSTÄNDIG":"AUTO CONFIGURATION INCOMPLETE";this._render();return; }
+      if (!await this._disableSchedule()) { this._error=this._lang()==="de"?"HEIZPLAN-FREIGABE NICHT VERFÜGBAR":"SCHEDULE CONTROL UNAVAILABLE";this._render();return; }
+      const id=this._config.control_entity||this._config.display_entity;
+      this._manualArmed=false;
+      if (this._autoSource()==="ha_schedule") {
+        await this._call("input_boolean","turn_on",{entity_id:this._config.schedule_enable_entity});
+      } else {
+        await this._call("climate","set_hvac_mode",{entity_id:id,hvac_mode:this._autoSource()==="device_schedule"?"auto":"heat"});
+      }
+      return;
+    }
+    if (!await this._disableSchedule()) { this._error=this._lang()==="de"?"HEIZPLAN-FREIGABE NICHT VERFÜGBAR":"SCHEDULE CONTROL UNAVAILABLE";this._render();return; }
+    if (["device_schedule","ha_schedule"].includes(this._autoSource()) && mode==="MANUELL" && !this._hasModeAction(mode)) {
+      if (this._canMode(mode)) await this._call("climate","set_hvac_mode",{entity_id:this._config.control_entity||this._config.display_entity,hvac_mode:"heat"});
+      return;
+    }
     if(this._hasModeAction(mode)){
       let action;
       try{action=frankysModeAction(this._modeAction(mode));}
@@ -605,6 +662,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
   async _toggleFlame() {
     if(this._pending||!this._hass)return;
+    if (this._config.schedule_enable_entity && !await this._disableSchedule()) return;
     if(this._config.flame_switch_entity){
       if(this._mode()==="AUS")return;
       const id=this._config.flame_switch_entity,domain=id.split(".")[0],e=this._state(id);
@@ -670,7 +728,8 @@ class JarvisClimateCardLegacy extends HTMLElement {
   }
 
   async _setTarget(next) {
-    if (this._pending || !Number.isFinite(next)) return false;
+    if (this._pending || !Number.isFinite(next) || next < this._minTemp() || next > this._maxTemp()) return false;
+    if (this._autoSource()==="ha_schedule" && !await this._disableSchedule()) return false;
     let domain, service, data;
     if (this._config.target_entity) {
       const entityDomain = this._config.target_entity.split(".")[0];
@@ -732,14 +791,22 @@ class JarvisClimateCardLegacy extends HTMLElement {
     });
   }
 
+  _nearSliderHandle(x,y) {
+    const marker=this.shadowRoot.querySelector("[data-slider-pointer]");
+    if (!marker || !marker.getBoundingClientRect) return false;
+    const box=marker.getBoundingClientRect(), pad=12;
+    return x>=box.left-pad && x<=box.right+pad && y>=box.top-pad && y<=box.bottom+pad;
+  }
   _bindSlider() {
-    const slider = this.shadowRoot.querySelector("[data-slider]");
+    const ring = this.shadowRoot.querySelector("[data-slider]");
+    const slider = this.shadowRoot.querySelector("[data-slider-handle]") || ring;
     if (!slider) return;
     const tolerance = 14;
     const begin = (id, x, y, pointerType) => {
       if (this._pending || this._sliderDrag || !Number.isFinite(this._targetTemp()) ||
           this._maxTemp() <= this._minTemp()) return false;
-      const tapValue = this._sliderValue({ clientX: x, clientY: y }, slider);
+      if (pointerType!=="mouse" && !this._nearSliderHandle(x,y)) return false;
+      const tapValue = pointerType==="mouse" ? this._sliderValue({ clientX: x, clientY: y }, ring || slider) : this._targetTemp();
       this._sliderDrag = { id, x, y, value: tapValue, tapValue, dragging: false, pointerType };
       this._previewSlider(tapValue);
       return true;
@@ -752,14 +819,14 @@ class JarvisClimateCardLegacy extends HTMLElement {
         if (drag.pointerType !== "mouse" && moved < tolerance) return;
         drag.dragging = true;
       }
-      this._previewSlider(this._sliderValue({ clientX: x, clientY: y }, slider, drag.value));
+      this._previewSlider(this._sliderValue({ clientX: x, clientY: y }, ring || slider, drag.value));
     };
     const finish = (id, commit) => {
       const drag = this._sliderDrag;
       if (!drag || drag.id !== id) return;
       const value = drag.dragging ? drag.value : drag.tapValue;
       this._sliderDrag = null;
-      if (commit && value !== this._targetTemp()) this._setTarget(value);
+      if (commit && (drag.pointerType==="mouse" || drag.dragging) && value !== this._targetTemp()) this._setTarget(value);
       else this._render();
     };
     if (typeof window.PointerEvent === "function") {
@@ -872,6 +939,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
       e.attributes&&e.attributes.climate_entity===id);
   }
   _scheduleEnabled(){
+    if (["device_schedule","thermostat"].includes(this._autoSource())) return false;
     return !!this._scheduleState() || (["thermostat","advanced"].includes(this._profile()) &&
       /^climate\.[a-z0-9_]+$/.test(this._scheduleClimate()));
   }
@@ -1033,7 +1101,7 @@ class JarvisClimateCardLegacy extends HTMLElement {
           ${Number.isFinite(actual) ? `<circle cx="${g.currentMarker.x}" cy="${g.currentMarker.y}" r="7" fill="#e4fbff" stroke="#13dcff" stroke-width="3"/>` : ""}
           ${Number.isFinite(target) ? `<g clip-path="url(#pointerClip)"><line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="#ff7a10" stroke-width="29" stroke-linecap="round" opacity=".55" filter="url(#orangeGlow)"/><line data-slider-pointer x1="${g.pointerStart.x}" y1="${g.pointerStart.y}" x2="${g.pointerEnd.x}" y2="${g.pointerEnd.y}" stroke="url(#pointerGradient)" stroke-width="17" stroke-linecap="round"/></g>` : ""}
 
-          <path data-slider d="${g.arc}" fill="none" stroke="transparent" stroke-width="88" stroke-linecap="round" style="pointer-events:stroke;touch-action:none;cursor:pointer"/>
+          <path data-slider d="${g.arc}" fill="none" stroke="transparent" stroke-width="88" stroke-linecap="round" style="pointer-events:none;touch-action:pan-y;cursor:default"/>
 
           <circle cx="${g.cx}" cy="${g.cy}" r="171" fill="#07141d" stroke="#758b98" stroke-opacity=".55" stroke-width="3"/>
           <circle cx="${g.cx}" cy="${g.cy}" r="159" fill="none" stroke="#182e3b" stroke-width="8"/>
@@ -1227,6 +1295,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
       select.appendChild(opt);
     });
     select.value = info.current;
+    select.disabled=!!this._config.auto_source && this._config.auto_source!=="legacy";
   }
 
   _modeActionField(key, label) {
@@ -1262,12 +1331,24 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
     return wrap;
   }
 
+  _autoSourceField() {
+    const wrap=document.createElement("label"), title=document.createElement("div"), select=document.createElement("select"), note=document.createElement("div");
+    wrap.className="field";title.className="label";note.className="hint";select.id="auto_source";
+    const de=this._lang()==="de";
+    title.textContent=de?"AUTO: zuständige Steuerung":"AUTO: control source";
+    const labels=de?["Bisherige Konfiguration beibehalten","Gerätezeitplan","HA-Heizplan (Blueprint erforderlich)","Thermostatregelung ohne Zeitplan"]:["Keep existing configuration","Device schedule","HA schedule (blueprint required)","Thermostat without schedule"];
+    ["legacy","device_schedule","ha_schedule","thermostat"].forEach((value,i)=>{const o=document.createElement("option");o.value=value;o.textContent=labels[i];select.appendChild(o);});
+    select.value=this._config.auto_source||"legacy";
+    select.addEventListener("change",ev=>{this._fireChanged("auto_source",ev.target.value);this._refreshAutoModeOptions();});
+    note.textContent=de?"Nur eine Zeitplansteuerung verwenden. Gerätezeitplan sendet auto; HA-Heizplan benötigt Plan, eigenen Freigabehelfer und aktive Blueprint-Automation. Eigene Modusaktionen/Modushelfer bleiben im bisherigen Modus. Details und Einrichtung: README im Repository.":"Use one scheduler only. Device schedule sends auto; HA schedule requires a schedule, dedicated enable helper and active blueprint automation. Keep legacy mode for custom mode actions/helpers. See repository README for setup.";
+    wrap.appendChild(title);wrap.appendChild(select);wrap.appendChild(note);return wrap;
+  }
   _autoModeField() {
     const wrap = document.createElement("label");
     wrap.className = "field";
     const title = document.createElement("div");
     title.className = "label";
-    title.textContent = this._t("AUTO-Betriebsmodus");
+    title.textContent = this._lang()==="de"?"AUTO-Gerätemodus (bisherige Konfiguration)":"AUTO device mode (legacy configuration)";
     wrap.appendChild(title);
     const select = document.createElement("select");
     select.id = "auto_hvac_mode";
@@ -1275,7 +1356,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
     wrap.appendChild(select);
     const note = document.createElement("div");
     note.className = "hint";
-    note.textContent = this._t("Wird bei AUTO an das Thermostat gesendet. Angeboten werden nur Modi, die das Gerät meldet.");
+    note.textContent = this._lang()==="de"?"Nur bei bisheriger Konfiguration aktiv; eine gewählte AUTO-Steuerung legt den Gerätemodus eindeutig fest.":"Only active for legacy configuration; an explicit AUTO source determines the device mode.";
     wrap.appendChild(note);
     // Populate once the element is attached to the shadow DOM.
     Promise.resolve().then(() => this._refreshAutoModeOptions());
@@ -2136,6 +2217,7 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         const de = this._lang() === "de";
         return `${this._curveMarkup()}<text data-title="actual" x="208" y="273" font-size="26" fill="#aacbdc">${de ? "Ist-Temperatur" : "Current Temp."}</text>
         <text data-title="mode" x="225" y="545" font-size="34" fill="#d3efff">${de ? "Modus" : "Mode"}</text>
+        <text x="287" y="574" text-anchor="middle" font-size="14" fill="#aacbdc">${this._autoSourceLabel()}</text>
         <text data-actual x="287" y="371" text-anchor="middle" font-size="108" font-weight="600" letter-spacing="-4" fill="url(#cold)">${this._fmtTemp(actual)}</text>
         <text x="398" y="326" font-size="43" fill="#f0f6ff">${this._displayTempUnit()}</text>
         ${["AUS", "AUTO", "MANUELL"].map((m, i) => {
@@ -2188,13 +2270,13 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         <text x="940" y="560" text-anchor="middle" font-size="31" fill="#eaf5fc">${this._t("target")}</text>
         <text data-slider-value x="918" y="665" text-anchor="middle" font-size="112" font-weight="700" letter-spacing="-4" fill="url(#hot)" filter="url(#halo)">${this._fmtTemp(target)}</text>
         <text x="1038" y="620" font-size="42" fill="#ffb63b">${this._displayTempUnit()}</text>
-        <g data-slider-pointer transform="rotate(${rotate} ${CX} ${CY})" pointer-events="none">
+        <g data-slider-pointer data-slider-handle transform="rotate(${rotate} ${CX} ${CY})" style="pointer-events:all;touch-action:none;cursor:grab">
           <rect x="921" y="264" width="44" height="119" rx="22" fill="#ff6a00" filter="url(#glow)" opacity=".8"/>
           <rect x="919" y="262" width="48" height="123" rx="24" fill="#1b0d06" stroke="#9aa9b0" stroke-width="2"/>
           <rect x="921" y="264" width="44" height="119" rx="22" fill="#55200a" stroke="#ff7900" stroke-width="2"/>
           <rect x="929" y="272" width="26" height="102" rx="13" fill="url(#pointer)" stroke="#ffd63b" stroke-width="2"/>
         </g>
-        <path data-slider d="M${f1(start[0])} ${f1(start[1])} A332 332 0 1 1 ${f1(end[0])} ${f1(end[1])}" fill="none" stroke="transparent" stroke-width="62" style="pointer-events:stroke;touch-action:none;cursor:pointer"/>
+        <path data-slider d="M${f1(start[0])} ${f1(start[1])} A332 332 0 1 1 ${f1(end[0])} ${f1(end[1])}" fill="none" stroke="transparent" stroke-width="62" style="pointer-events:none;touch-action:pan-y;cursor:default"/>
         <g pointer-events="none"><circle cx="814" cy="768" r="78" fill="url(#keygloss)"/><circle cx="1058" cy="768" r="78" fill="url(#keygloss)"/></g>
         <circle class="hit key" data-action="minus" cx="814" cy="768" r="84" role="button" aria-label="−"/>
         <circle class="hit key" data-action="plus" cx="1058" cy="768" r="84" role="button" aria-label="+"/>
@@ -2223,9 +2305,6 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
         </style><div class="hybrid-frame">${body}</div>`;
 
         this._bindSlider();
-        // touch-action is ignored on SVG children by Chromium: block page scrolling while a finger is on the ring.
-        const ring = this.shadowRoot.querySelector("[data-slider]");
-        if (ring) ring.addEventListener("touchstart", event => { if (event.cancelable) event.preventDefault(); }, { passive: false });
         const schedule = this.shadowRoot.querySelector('[data-action="schedule"]');
         if (schedule) schedule.addEventListener("keydown", event => {
           if (event.key === "Enter" || event.key === " ") { event.preventDefault(); this._openSchedule(); }
@@ -2246,12 +2325,18 @@ class JarvisClimateCardLegacyEditor extends HTMLElement {
     class FrankysClimateCardEditor extends BaseEditor {
       setConfig(config) {
         super.setConfig({ type: CARD_TYPE, ...config });
+        this._refreshAutoModeOptions();
       }
 
       _render() {
         super._render();
         const fields = this.shadowRoot && this.shadowRoot.querySelector("#fields");
-        if (fields && !this.shadowRoot.querySelector("#auto_hvac_mode")) fields.appendChild(this._autoModeField());
+        if (fields && !this.shadowRoot.querySelector("#auto_hvac_mode")) {
+          fields.appendChild(this._autoSourceField());
+          fields.appendChild(this._autoModeField());
+          fields.appendChild(this._picker(this._lang()==="de"?"HA-Heizplan: Freigabehelfer (Blueprint)":"HA schedule: enable helper (blueprint)","schedule_enable_entity",["input_boolean"]));
+          fields.appendChild(this._picker(this._lang()==="de"?"HA-Heizplan: ausführende Automation":"HA schedule: runner automation","schedule_automation_entity",["automation"]));
+        }
       }
     }
     customElements.define(TAG, FrankysClimateCard);
