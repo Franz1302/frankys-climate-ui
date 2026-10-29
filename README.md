@@ -1,8 +1,8 @@
-# Franky's Climate UI — v0.2.6
+# Franky's Climate UI — v0.2.7
 
 ![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
-A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
+A standalone Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Existing configurations retain their legacy controls; an explicit AUTO source and optional server-side schedule runner are described below.
 
 
 ## Updated JARVIS UI
@@ -103,3 +103,56 @@ Core behavior simulated with native HVAC, helper modes, target temperature helpe
 ### License
 
 MIT (see LICENSE).
+
+## Explicit AUTO source and safer touch control (v0.2.7)
+
+Choose **AUTO: control source** in the visual editor, or set `auto_source`:
+
+| Value | AUTO behavior | Requirements |
+| --- | --- | --- |
+| `device_schedule` | Sends only native `hvac_mode: auto`, without sending a temperature | Device reports `auto`; for example a supported Tado integration |
+| `thermostat` | Sends native `heat`; regulates the selected temperature without a time schedule | Device reports `heat` |
+| `ha_schedule` | Enables the selected HA schedule runner; it applies the current valid setpoint with `heat` | Schedule, dedicated enable helper, installed and enabled blueprint automation |
+| `legacy` (default) | Keeps existing actions, helpers and `auto_hvac_mode` behavior | Existing setups remain unchanged |
+
+The chosen source is shown below the mode heading. AUTO never imports a device
+schedule. Use **one writer per climate**: turn off any previous HA schedule writer
+before enabling the new runner. A card cannot stop unrelated automations or a
+manufacturer app from writing to the same thermostat.
+
+For **HA schedule**, import [the automation blueprint](blueprints/automation/climate-ui-schedule.yaml)
+into Home Assistant (copy to `config/blueprints/automation/frankys/climate-ui-schedule.yaml`
+and reload blueprints, or import using this file's GitHub URL after publication).
+Create one dedicated Toggle helper, initially off, and one automation from the
+blueprint for each climate. Select the same climate, schedule and enable helper
+in the automation and card; select the resulting enabled automation in the card.
+This setup is explicit: the card does not install or alter automations.
+
+```yaml
+type: custom:frankys-climate-ui-card
+display_entity: climate.living_room
+auto_source: ha_schedule
+schedule_entity: schedule.living_room
+schedule_enable_entity: input_boolean.living_room_schedule
+schedule_automation_entity: automation.living_room_schedule
+```
+
+Set schedule block `temperature` in the climate's native unit. The blueprint runs
+on HA, including when browsers are closed and after HA starts; empty periods turn
+heating off, invalid/unavailable values send no temperature. It controls climate
+entities directly. Existing special setups with `target_entity`, `mode_entity`
+or explicit AUTO actions must keep `legacy` and their existing automation.
+
+AUS, MANUELL, flame control or a manual temperature change in this card disable
+its schedule enable helper before proceeding. Native device-schedule mode uses
+`heat` for MANUELL and `auto` for AUTO. For changing an existing card from HA
+schedule to another source, press AUS first and keep its enable-helper mapping
+until the source change is complete. Changes made from other apps do not toggle
+this helper. Unsupported or incomplete AUTO selections are refused.
+
+Missing or empty temperature values display a dash and cannot start a dial drag.
+On touchscreens drag the orange handle; touching/swiping elsewhere on the ring
+scrolls the dashboard. A tap or a cancelled drag sends no temperature. Plus/minus
+buttons remain available when there is a valid reported target.
+
+Release validation covers automated controls, setpoint and pointer regressions. Actual Tado/Homematic IP hardware and tablet touch operation have not been verified; compatibility depends on the climate modes exposed by the selected Home Assistant integration.

@@ -1,0 +1,75 @@
+blueprint:
+  name: Franky's Climate UI – selected HA heating schedule
+  description: >-
+    Runs one Schedule helper while its dedicated enable helper is on, including
+    with every dashboard closed. Use the same three entities in the card.
+    Disable previous writers for this climate before enabling this automation.
+    Schedule block data.temperature uses the climate entity's native unit.
+    This blueprint controls the climate directly; separate target/mode helpers
+    must keep their existing automation and legacy card configuration.
+    Empty schedule periods turn the climate off. Manual changes made in this
+    card disable the enable helper. Changes from other apps do not do so.
+  domain: automation
+  input:
+    climate_entity:
+      name: Climate entity
+      selector:
+        entity:
+          domain: climate
+    schedule_entity:
+      name: Schedule helper (block data.temperature)
+      selector:
+        entity:
+          domain: schedule
+    enable_entity:
+      name: Dedicated input_boolean enable helper (initially off)
+      selector:
+        entity:
+          domain: input_boolean
+variables:
+  climate_id: !input climate_entity
+  schedule_id: !input schedule_entity
+  enable_id: !input enable_entity
+triggers:
+  - trigger: state
+    entity_id: !input schedule_entity
+  - trigger: state
+    entity_id: !input enable_entity
+  - trigger: state
+    entity_id: !input climate_entity
+    from: 'unavailable'
+  - trigger: state
+    entity_id: !input climate_entity
+    from: 'unknown'
+  - trigger: homeassistant
+    event: start
+actions:
+  - condition: state
+    entity_id: !input enable_entity
+    state: 'on'
+  - choose:
+      - conditions: "{{ is_state(schedule_id, 'off') }}"
+        sequence:
+          - action: climate.turn_off
+            target:
+              entity_id: !input climate_entity
+    default:
+      - condition: template
+        value_template: >-
+          {{ is_state(schedule_id, 'on') and
+             states(climate_id) not in ['unknown', 'unavailable'] and
+             'heat' in (state_attr(climate_id, 'hvac_modes') or []) and
+             state_attr(schedule_id, 'climate_entity') in [none, '', climate_id] and
+             state_attr(schedule_id, 'target_entity') in [none, ''] and
+             state_attr(schedule_id, 'mode_entity') in [none, ''] and
+             is_number(state_attr(schedule_id, 'temperature')) and
+             is_number(state_attr(climate_id, 'min_temp')) and
+             is_number(state_attr(climate_id, 'max_temp')) and
+             (state_attr(climate_id, 'min_temp') | float) <= (state_attr(schedule_id, 'temperature') | float) <= (state_attr(climate_id, 'max_temp') | float) }}
+      - action: climate.set_temperature
+        target:
+          entity_id: !input climate_entity
+        data:
+          temperature: "{{ state_attr(schedule_id, 'temperature') | float }}"
+          hvac_mode: heat
+mode: restart

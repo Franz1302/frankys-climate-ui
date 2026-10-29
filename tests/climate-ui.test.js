@@ -317,5 +317,70 @@ function make(extra={}){
 
  // The visual editor must expose the unit selector in addition to the language selector.
  assert(source.includes('id="temperature_unit"') && source.includes('id="language"'));
- console.log('PASS: Climate UI 3D HUD, controls, 12h chart, DE/EN and °C/°F conversions');
+ // Explicit AUTO sources must select one owner and never resend a stale setpoint.
+ const device=make({auto_source:'device_schedule'});
+ await device.c._setMode('AUTO');
+ assert.equal(device.calls.length,1);
+ assert.equal(device.calls[0][2].hvac_mode,'auto');
+ assert(!device.calls.some(x=>x[1]==='set_temperature'));
+ assert.equal(device.c._mode(),'MANUELL');
+ device.states['climate.one'].state='auto';assert.equal(device.c._mode(),'AUTO');
+ const regulator=make({auto_source:'thermostat'});
+ await regulator.c._setMode('AUTO');assert.equal(regulator.calls[0][2].hvac_mode,'heat');
+ assert.equal(regulator.c._scheduleEnabled(),false);
+ const wrongDevice=make({auto_source:'device_schedule'});
+ wrongDevice.states['climate.one'].attributes.hvac_modes=['off','heat'];
+ await wrongDevice.c._setMode('AUTO');assert.equal(wrongDevice.calls.length,0);
+ assert(wrongDevice.c._error.includes('INCOMPLETE'));
+ const managed=make({auto_source:'ha_schedule',schedule_entity:'schedule.plan',schedule_enable_entity:'input_boolean.enable',schedule_automation_entity:'automation.runner'});
+ managed.states['input_boolean.enable']={state:'off',attributes:{}};
+ managed.states['automation.runner']={state:'on',attributes:{}};
+ assert(managed.c._scheduleReady());
+ await managed.c._setMode('AUTO');
+ assert.deepEqual(managed.calls.map(x=>[x[0],x[1]]),[['input_boolean','turn_on']]);
+ managed.states['input_boolean.enable'].state='on';
+ assert.equal(managed.c._mode(),'AUTO');
+ managed.calls.length=0;
+ await managed.c._setMode('AUS');
+ assert.deepEqual(managed.calls.map(x=>[x[0],x[1]]),[['input_boolean','turn_off'],['climate','turn_off']]);
+ managed.calls.length=0;await managed.c._setTarget(22);
+ assert.equal(managed.calls[0][0],'input_boolean','Manual setpoint disables HA schedule first');
+ managed.calls.length=0;managed.states['automation.runner'].state='off';
+ await managed.c._setMode('AUTO');assert.equal(managed.calls.length,0,'Disabled runner cannot pretend to run AUTO');
+
+ // Missing setpoints never become zero and cannot start a touch gesture.
+ for(const value of [null,undefined,'','   ']){
+   const missing=make();missing.states['climate.one'].attributes.temperature=value;
+   assert(Number.isNaN(missing.c._targetTemp()));
+   assert.equal(missing.c._fmtTemp(missing.c._targetTemp()),'–');
+   await missing.c._changeTarget(.5);assert.equal(missing.calls.length,0);
+ }
+ const limits=make();await limits.c._setTarget(999);assert.equal(limits.calls.length,0);
+ // Reuse the VM DOM harness: listeners are attached to the handle, not the ring.
+ const pointerBefore=ctx.window.PointerEvent;ctx.window.PointerEvent=function(){};
+ function gesture(value=21){
+   const obj=make();obj.states['climate.one'].attributes.temperature=value;
+   const events={},ring={};
+   const handle={addEventListener:(type,fn)=>events[type]=fn,setPointerCapture(){},hasPointerCapture:()=>false,
+     getBoundingClientRect:()=>({left:100,right:150,top:100,bottom:200})};
+   obj.c.shadowRoot={querySelector:q=>q==='[data-slider]'?ring:handle};
+   obj.c._sliderValue=(ev,geometry)=>{assert.equal(geometry,ring,'Handle transforms must not rotate the gesture coordinates');return 25;};
+   obj.c._previewSlider=v=>{obj.c._sliderDrag.value=v;};
+   obj.c._bindSlider();return {...obj,events};
+ }
+ const event=(x=120,y=120)=>({button:0,isPrimary:true,pointerId:1,pointerType:'touch',clientX:x,clientY:y,preventDefault(){this.prevented=true;},stopPropagation(){}});
+ const tap=gesture();tap.events.pointerdown(event());
+ let panBlocked=false;tap.events.touchstart({cancelable:true,preventDefault(){panBlocked=true;}});assert(panBlocked,'Active handle suppresses native pan in SVG browsers');
+ tap.events.pointerup(event());
+ assert.equal(tap.calls.length,0,'Handle tap must not change setpoint');
+ const scroll=gesture(),outside=event(300,300);scroll.events.pointerdown(outside);
+ assert(!outside.prevented);assert(!scroll.c._sliderDrag,'Scroll away from handle is untouched');
+ const drag=gesture();drag.events.pointerdown(event());drag.events.pointermove(event(150,150));drag.events.pointerup(event(150,150));
+ assert.equal(drag.calls.length,1);assert.equal(drag.calls[0][2].temperature,25);
+ const cancelled=gesture();cancelled.events.pointerdown(event());cancelled.events.pointermove(event(150,150));cancelled.events.pointercancel(event());
+ assert.equal(cancelled.calls.length,0);
+ const missingDrag=gesture(null);missingDrag.events.pointerdown(event());assert(!missingDrag.c._sliderDrag);
+ ctx.window.PointerEvent=pointerBefore;
+ assert(source.includes('pointer-events:none;touch-action:pan-y'),'The broad ring must allow dashboard scrolling');
+ console.log('PASS: Climate UI AUTO sources, missing setpoints, handle-only touch, schedules, HUD and units');
 })().catch(error=>{console.error(error);process.exitCode=1});
