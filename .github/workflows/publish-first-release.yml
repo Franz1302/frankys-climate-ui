@@ -16,17 +16,17 @@ jobs:
       github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     steps:
-      - name: Publish v0.2.6 after successful validation
+      - name: Publish v0.2.7 after successful validation
         env:
           GH_TOKEN: ${{ github.token }}
           VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          if gh release view v0.2.6 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release v0.2.6 already exists."
+          if gh release view v0.2.7 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v0.2.7 already exists."
             exit 0
           fi
-          gh release create v0.2.6 \
+          gh release create v0.2.7 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$VERIFIED_SHA" \
-            --title "Franky's Climate UI v0.2.6" \
-            --notes "Restore Climate Card v0.2.8 control compatibility while preserving the new UI: native thermostat heat means AUTO; restore configured profiles, manual heater control, OFF scripts and helper actions. Restore explicit heating schedule creation and resolve existing schedules through entity registry IDs. Target temperature handling and visual design remain unchanged. Syntax, functional regression and HACS checks passed before publication. No automatic Home Assistant installation; timed schedule execution still requires an existing automation."
+            --title "Franky's Climate UI v0.2.7" \
+            --notes "Explicit AUTO source selection: device schedule (native auto only), thermostat regulation, or an HA schedule with the supplied server-side blueprint and dedicated enable helper. Existing configurations keep legacy behavior. Missing setpoints show a dash; touch control is limited to dragging the orange handle. No additional resume button is needed. HA schedule execution requires explicit blueprint/helper/automation setup; previous competing schedule writers must be disabled. Blueprint controls climate entities directly; advanced helper-based setups retain their existing legacy runner. Automated syntax, functional and HACS checks passed; actual Tado/Homematic IP hardware and tablet touch operation remain unverified. No automatic Home Assistant installation."
