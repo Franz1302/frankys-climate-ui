@@ -1,8 +1,8 @@
-# Franky's Climate UI — v0.2.6
+# Franky's Climate UI — v0.2.7
 
 ![Climate UI v0.2.0 in Home Assistant](images/climate-ui-v0.2.0-preview.png)
 
-A standalone **visual-only** Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Its heating behavior and source remain unchanged.
+A standalone Lovelace climate interface by Franky's Stuff, based on the familiar JARVIS design. This is **not** an update to Frankys_Stuff Climate Card. Existing configurations retain their legacy controls; an explicit AUTO source and optional server-side schedule runner are described below.
 
 
 ## Updated JARVIS UI
@@ -104,7 +104,7 @@ Core behavior simulated with native HVAC, helper modes, target temperature helpe
 
 MIT (see LICENSE).
 
-## Explicit AUTO source and safer touch control (unreleased)
+## Explicit AUTO source and safer touch control (v0.2.7)
 
 Choose **AUTO: control source** in the visual editor, or set `auto_source`:
 
@@ -154,3 +154,5 @@ Missing or empty temperature values display a dash and cannot start a dial drag.
 On touchscreens drag the orange handle; touching/swiping elsewhere on the ring
 scrolls the dashboard. A tap or a cancelled drag sends no temperature. Plus/minus
 buttons remain available when there is a valid reported target.
+
+Release validation covers automated controls, setpoint and pointer regressions. Actual Tado/Homematic IP hardware and tablet touch operation have not been verified; compatibility depends on the climate modes exposed by the selected Home Assistant integration.
