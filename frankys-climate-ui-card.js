@@ -830,6 +830,8 @@ class JarvisClimateCardLegacy extends HTMLElement {
       else this._render();
     };
     if (typeof window.PointerEvent === "function") {
+      // SVG touch-action is inconsistent across browsers; suppress native pan only on the active handle.
+      slider.addEventListener("touchstart", ev => { if (this._sliderDrag && ev.cancelable) ev.preventDefault(); }, { passive: false });
       slider.addEventListener("pointerdown", ev => {
         if (ev.button !== 0 || ev.isPrimary === false) return;
         if (!begin(ev.pointerId, ev.clientX, ev.clientY, ev.pointerType)) return;

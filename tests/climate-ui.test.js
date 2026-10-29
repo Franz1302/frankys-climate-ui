@@ -369,7 +369,9 @@ function make(extra={}){
    obj.c._bindSlider();return {...obj,events};
  }
  const event=(x=120,y=120)=>({button:0,isPrimary:true,pointerId:1,pointerType:'touch',clientX:x,clientY:y,preventDefault(){this.prevented=true;},stopPropagation(){}});
- const tap=gesture();tap.events.pointerdown(event());tap.events.pointerup(event());
+ const tap=gesture();tap.events.pointerdown(event());
+ let panBlocked=false;tap.events.touchstart({cancelable:true,preventDefault(){panBlocked=true;}});assert(panBlocked,'Active handle suppresses native pan in SVG browsers');
+ tap.events.pointerup(event());
  assert.equal(tap.calls.length,0,'Handle tap must not change setpoint');
  const scroll=gesture(),outside=event(300,300);scroll.events.pointerdown(outside);
  assert(!outside.prevented);assert(!scroll.c._sliderDrag,'Scroll away from handle is untouched');
