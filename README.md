@@ -100,7 +100,7 @@ Configure an existing `schedule` helper under **Settings → Devices & services 
 
 ### Testing
 
-Core behavior simulated with native HVAC, helper modes, target temperature helper, heating sensor, on/off flame actor and AUS guard; JavaScript compilation and HUD markup render checked. Hardware testing and native schedule dialog verification remain outstanding. v0.1.2 is a preview; review behavior before controlling real heating hardware.
+Automated checks cover simulated climate controls, helper modes, target temperatures, heating status, flame control and the AUS guard, plus JavaScript syntax and rendered card markup. Release validation also covers setpoint and pointer regressions. These checks do not replace testing on real devices: Tado/Homematic IP hardware, tablet touch operation and the native Home Assistant schedule dialog have not been independently verified.
 
 ### License
 
