@@ -7,7 +7,7 @@ A standalone Lovelace climate interface by Franky's Stuff, based on the familiar
 
 ## Updated JARVIS UI
 
-This is an **update to the existing card**, not a second card or design. The Home Assistant card type remains `custom:frankys-climate-ui-card` and the existing HACS installation and configurations remain valid. The new look replaces the previous interface automatically.
+This design refresh updates **Franky's Climate UI itself**. It does not update or replace **Frankys_Stuff Climate Card**, which is a separate card. The Home Assistant card type remains `custom:frankys-climate-ui-card` and the existing HACS installation and configurations remain valid. The new look replaces the previous interface automatically.
 
 - Photo-realistic glass/neon thermostat that always remains **one proportional card**: the ring, temperature curve and mode buttons scale together, even in narrow dashboard columns. No vertically stacked panels or layout change.
 - Temperature dial scale adapts to the entity's configured min/max limits (including sauna, pool and Fahrenheit ranges).
@@ -24,7 +24,7 @@ language: auto
 temperature_unit: auto
 ```
 
-No migration, new resource, or additional HACS repository is required. A normal update will change the appearance for all existing cards.
+No migration, new resource, or additional HACS repository is required. A normal Climate UI update will change the appearance for existing Climate UI cards only.
 
 ## Functions
 
@@ -90,7 +90,9 @@ You may assign `mode_off_action`, `mode_auto_action` or `mode_manual_action` to 
 
 ### Installation
 
-Add `https://github.com/Franz1302/frankys-climate-ui` to **HACS → Custom repositories** as category **Dashboard/Lovelace**, then install **Franky's Climate UI**. Add a new dashboard card with type `custom:frankys-climate-ui-card`. This repository is independent of Frankys_Stuff Climate Card; you can keep both cards installed.
+Open **HACS**, search for **Franky's Climate UI**, and download it directly from the default catalogue. Add a new dashboard card with type `custom:frankys-climate-ui-card`. This repository is independent of Frankys_Stuff Climate Card; you can keep both cards installed.
+
+Alternatively, add `https://github.com/Franz1302/frankys-climate-ui` to **HACS → Custom repositories** as category **Dashboard/Lovelace**, then install **Franky's Climate UI**. Adding a custom repository is not required for the normal HACS installation.
 
 ### Heating schedule editing
 
